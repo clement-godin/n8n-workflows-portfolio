@@ -1,6 +1,6 @@
 # n8n Workflows Portfolio
 
-Portfolio technique de **83 workflows n8n** issus d'une instance self-hosted réelle utilisée pour automatiser les opérations d'une agence de services (EMA Fuites — recherche de fuites non destructive, Nord / Hauts-de-France) et de plusieurs entités sœurs (MSHDF, MEA, IEA ADMI).
+Portfolio technique de **83 workflows n8n** issus d'une instance self-hosted réelle, dont une quarantaine actifs en production. Les workflows archivés sont des expérimentations, versions remplacées ou projets abandonnés — publiés ici pour illustrer la variété des cas d'usage explorés et la culture d'itération. Cette instance automatise les opérations d'une agence de services (EMA Fuites — recherche de fuites non destructive, Nord / Hauts-de-France) et de plusieurs entités sœurs (MSHDF, MEA, IEA ADMI).
 
 Ce dépôt documente des automatisations **effectivement déployées en production** — pas des démos de test — couvrant l'acquisition, le CRM, la relation client par IA, la téléphonie, l'infrastructure et les outils internes. Toutes les données sensibles (clés API, tokens, emails, téléphones, IDs de documents, IPs) ont été remplacées par des placeholders avant publication ; la logique et l'architecture de chaque workflow sont conservées à l'identique.
 
