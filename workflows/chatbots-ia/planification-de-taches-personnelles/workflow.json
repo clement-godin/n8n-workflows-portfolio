@@ -1,0 +1,832 @@
+{
+  "name": "PLANIFICATION DE TACHES PERSONNELLES",
+  "active": true,
+  "nodes": [
+      {
+        "parameters": {
+          "updates": [
+            "message",
+            "callback_query"
+          ],
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegramTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -96,
+          644
+        ],
+        "id": "c7dd9c33-3698-43d6-872f-621715885dea",
+        "name": "Trigger - Telegram tâches",
+        "webhookId": "5b1ba792-d8da-4c14-9485-263485957808",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "loose",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.message.voice.file_id }}",
+                      "rightValue": "",
+                      "operator": {
+                        "type": "boolean",
+                        "operation": "exists",
+                        "singleValue": true
+                      },
+                      "id": "abfae725-f6ea-47ed-923b-70c083651599"
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "msg audio"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "loose",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "id": "7d8207ef-7cc1-4705-88fe-83613150b43f",
+                      "leftValue": "={{ $json.message.text }}",
+                      "rightValue": "",
+                      "operator": {
+                        "type": "boolean",
+                        "operation": "exists",
+                        "singleValue": true
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "msg text"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "loose",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "id": "c1e2d0d3-873c-4776-895e-af02f1431952",
+                      "leftValue": "={{ $json.callback_query.data }}",
+                      "rightValue": "annuler_audio",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "name": "filter.operator.equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "audio pas ok"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "loose",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "id": "d36057bc-cff5-4597-ac5b-ff706cadd362",
+                      "leftValue": "={{ $json.callback_query.data }}",
+                      "rightValue": "valider_audio",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "name": "filter.operator.equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "audio ok"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "loose",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "id": "07c2e57e-54a3-414c-a8ff-0c9d5107f85c",
+                      "leftValue": "={{ $json.callback_query.data }}",
+                      "rightValue": "tache_ok",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "name": "filter.operator.equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "tache ok"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "loose",
+                    "version": 3
+                  },
+                  "conditions": [
+                    {
+                      "id": "562caafd-e8af-4600-a954-605730825551",
+                      "leftValue": "={{ $json.callback_query.data }}",
+                      "rightValue": "tache_PAS_OK",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "name": "filter.operator.equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "tache_PAS_OK"
+              }
+            ]
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.4,
+        "position": [
+          128,
+          580
+        ],
+        "id": "8062d21c-e5da-4f48-abad-14eb6425eb50",
+        "name": "Switch - Type message"
+      },
+      {
+        "parameters": {
+          "resource": "audio",
+          "operation": "transcribe",
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 2.1,
+        "position": [
+          704,
+          -96
+        ],
+        "id": "55092ddc-3cae-48b2-89b5-b1463ef5956b",
+        "name": "Transcribe a recording",
+        "credentials": {
+          "openAiApi": {
+            "id": "9LS6CDaep0lZZnNq",
+            "name": "OpenAi perso account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resource": "file",
+          "fileId": "={{ $json.message.voice.file_id }}",
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          416,
+          -96
+        ],
+        "id": "9978908e-a377-4441-93d6-c8a367a1be29",
+        "name": "Get a file",
+        "webhookId": "10a47e93-9329-4764-a1ef-1f4bce9096a2",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "=Message : {{ $json.message.text }}\n",
+          "messages": {
+            "messageValues": [
+              {
+                "message": "=Tu es un assistant d'extraction de données. À partir du message suivant, extrais ces informations et réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, sans balises markdown, sans backticks :\n{\n\"titre\": \"titre de la tâche\",\n\"date\": \"date au format YYYY-MM-DD ou null si absente\",\n\"heure\": \"heure au format HH:mm ou null si absente\",\n\"description\": \"description de la tâche ou null si absente\"\n}\n\nNous sommes le {{ $now.format('dd/MM/yyyy') }}.\nSi une date est mentionnée sans année, utilise l'année courante ou la prochaine occurrence future de cette date. Pour l'heure, utilise le format 24h."
+              }
+            ]
+          },
+          "batching": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.9,
+        "position": [
+          352,
+          96
+        ],
+        "id": "4469c4d2-b7b7-4751-ab33-19fd991dc3a7",
+        "name": "Basic LLM Chain"
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "claude-haiku-4-5-20251001",
+            "mode": "list",
+            "cachedResultName": "Claude Haiku 4.5"
+          },
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          424,
+          320
+        ],
+        "id": "4929af10-710e-4fd9-a9c6-d1edc54709fe",
+        "name": "Anthropic Chat Model",
+        "credentials": {
+          "anthropicApi": {
+            "id": "8Wcb8jgMTJM6CQjM",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "team": "YOUR_CLICKUP_TEAM_ID",
+          "space": "YOUR_CLICKUP_SPACE_ID",
+          "folderless": true,
+          "list": "YOUR_CLICKUP_LIST_ID",
+          "name": "={{ $json.name }}",
+          "additionalFields": {
+            "assignees": [
+              "YOUR_CLICKUP_ASSIGNEE_ID"
+            ],
+            "content": "={{ $json.description }}",
+            "dueDate": "={{ $json.due_date }}",
+            "dueDateTime": "={{ $json.due_date_time }}"
+          }
+        },
+        "type": "n8n-nodes-base.clickUp",
+        "typeVersion": 1,
+        "position": [
+          928,
+          1088
+        ],
+        "id": "524a4160-4a9d-4599-b5ba-fa1c00b9b2d4",
+        "name": "Create a task",
+        "credentials": {
+          "clickUpApi": {
+            "id": "0lTKTU8yfGf6zxoe",
+            "name": "ClickUp account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "={{ $('Trigger - Telegram tâches').item.json.message.chat.id }}",
+          "text": "=Voici ce que j'ai compris : {{ $json.text }}",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "Valider",
+                      "additionalFields": {
+                        "callback_data": "valider_audio"
+                      }
+                    },
+                    {
+                      "text": "Recommencer",
+                      "additionalFields": {
+                        "callback_data": "annuler_audio"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          928,
+          -96
+        ],
+        "id": "498ba1d8-9de5-4d59-ae7f-3abea0e82a6f",
+        "name": "Send a text message1",
+        "webhookId": "4488de6e-d295-4619-bbab-dfd73a2ecc74",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "={{ $('Trigger - Telegram tâches').item.json.callback_query.message.chat.id }}",
+          "text": "=Ok, j'annule. Envoie-moi un nouveau vocal !",
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          416,
+          496
+        ],
+        "id": "4011b2f9-4273-454d-808e-003b558d0b07",
+        "name": "Send a text message2",
+        "webhookId": "4488de6e-d295-4619-bbab-dfd73a2ecc74",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "={{ $('Trigger - Telegram tâches').item.json.message.chat.id }}",
+          "text": "={{ $json.confirmation }}",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "OUI",
+                      "additionalFields": {
+                        "callback_data": "tache_ok"
+                      }
+                    },
+                    {
+                      "text": "NON",
+                      "additionalFields": {
+                        "callback_data": "tache_PAS_OK"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          928,
+          200
+        ],
+        "id": "a4509f87-fa07-4709-ac81-5a838cc30c91",
+        "name": "Send a text message",
+        "webhookId": "4488de6e-d295-4619-bbab-dfd73a2ecc74",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "let text = $json.text;\n\n// Nettoyage robuste caractère par caractère\nconst start = text.indexOf('{');\nconst end = text.lastIndexOf('}');\ntext = text.substring(start, end + 1);\n\nconst parsed = JSON.parse(text);\n\n// Construction du message de confirmation\n// On ajoute la ligne Heure avec une valeur par défaut\nconst confirmation = `✅ Voici ce que j'ai compris :\n\n📌 *Titre :* ${parsed.titre}\n📅 *Date :* ${parsed.date || 'Non précisée'}\n⏰ *Heure :* ${parsed.heure || 'Non précisée'}\n📝 *Description :* ${parsed.description || 'Aucune'}\n\nRéponds *OUI* pour confirmer ou *NON* pour annuler.`;\n\nreturn [{ json: { ...parsed, confirmation } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          704,
+          200
+        ],
+        "id": "7d7e471c-c13b-48e1-b74d-ff3771c3da85",
+        "name": "Code JS - Parse réponse LLM"
+      },
+      {
+        "parameters": {
+          "chatId": "={{ $('Trigger - Telegram tâches').item.json.callback_query.message.chat.id }}",
+          "text": "=Ok, j'annule. Envoie-moi un nouveau vocal ou message !",
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          416,
+          1280
+        ],
+        "id": "6df124e4-0b8b-415b-a709-3bc77a593925",
+        "name": "Send a text message3",
+        "webhookId": "4488de6e-d295-4619-bbab-dfd73a2ecc74",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// On cible spécifiquement le noeud \"Telegram Trigger\" pour récupérer le texte\nconst triggerData = $('Trigger - Telegram tâches').first().json;\nconst text = String(triggerData.callback_query?.message?.text || \"\");\n\n\nfunction extractCleanValue(keyword) {\n    const line = text.split('\\n').find(l => l.includes(keyword));\n    if (!line) return null;\n    const index = line.indexOf(':');\n    if (index === -1) return null;\n    let value = line.substring(index + 1);\n    value = value.replace(/[\\*📌📅⏰📝✅]/g, '').trim();\n    value = value.replace(/^,\\s*/, '').trim();\n    return value !== \"\" ? value : null;\n}\n\nconst titre       = extractCleanValue('Titre');\nconst dateStr     = extractCleanValue('Date');\nconst heureStr    = extractCleanValue('Heure');\nconst description = extractCleanValue('Description');\n\nlet clickUpTimestamp = null;\nlet hasTime = false;\n\nif (dateStr && dateStr !== 'Non précisée' && dateStr !== 'null') {\n\n    hasTime = !!(heureStr && heureStr !== 'Non précisée' && heureStr !== 'null');\n    const finalHeure = hasTime ? heureStr : \"00:00\";\n\n    // On crée la date brute (le serveur l'interprète dans son propre fuseau)\n    const rawDate = new Date(`${dateStr}T${finalHeure}:00`);\n\n    if (!isNaN(rawDate.getTime())) {\n        // Astuce infaillible : on force le calcul par rapport à l'heure de Paris\n        const dateInParisStr = rawDate.toLocaleString(\"en-US\", { timeZone: \"Europe/Paris\" });\n        const dateInParis = new Date(dateInParisStr);\n        \n        // On compense la différence exacte entre le serveur et Paris\n        const offset = rawDate.getTime() - dateInParis.getTime();\n        \n        // Le timestamp final est prêt pour ClickUp\n        clickUpTimestamp = rawDate.getTime() + offset;\n    }\n}\n\nconst finalDescription = (description && description !== 'Aucune' && description !== 'null')\n    ? description\n    : null;\n\nreturn [{\n    json: {\n        name: titre,\n        due_date: clickUpTimestamp,\n        due_date_time: hasTime, // L'excellente idée que vous avez eue !\n        description: finalDescription\n    }\n}];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          704,
+          1088
+        ],
+        "id": "ac304161-528e-4564-907a-dfc637ead67a",
+        "name": "Code JS - Prépare tâche ClickUp"
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "=Message : {{ $json.callback_query.message.text }}\n",
+          "messages": {
+            "messageValues": [
+              {
+                "message": "=Tu es un assistant d'extraction de données. À partir du message suivant, extrais ces informations et réponds UNIQUEMENT en JSON valide, sans aucun texte avant ou après, sans balises markdown, sans backticks :\n{\n\"titre\": \"titre de la tâche\",\n\"date\": \"date au format YYYY-MM-DD ou null si absente\",\n\"heure\": \"heure au format HH:mm ou null si absente\",\n\"description\": \"description de la tâche ou null si absente\"\n}\n\nNous sommes le {{ $now.format('dd/MM/yyyy') }}.\nSi une date est mentionnée sans année, utilise l'année courante ou la prochaine occurrence future de cette date. Pour l'heure, utilise le format 24h."
+              }
+            ]
+          },
+          "batching": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.9,
+        "position": [
+          352,
+          688
+        ],
+        "id": "c395de4e-cdc8-4aae-9e80-c703b3a4852d",
+        "name": "Basic LLM Chain1"
+      },
+      {
+        "parameters": {
+          "model": {
+            "__rl": true,
+            "value": "claude-haiku-4-5-20251001",
+            "mode": "list",
+            "cachedResultName": "Claude Haiku 4.5"
+          },
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+        "typeVersion": 1.3,
+        "position": [
+          424,
+          912
+        ],
+        "id": "026be4b4-6f3b-4277-80b5-97bb6fe28b85",
+        "name": "Anthropic Chat Model1",
+        "credentials": {
+          "anthropicApi": {
+            "id": "8Wcb8jgMTJM6CQjM",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "={{ $('Trigger - Telegram tâches').item.json.callback_query.message.chat.id }}",
+          "text": "={{ $json.confirmation }}",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "buttons": [
+                    {
+                      "text": "OUI",
+                      "additionalFields": {
+                        "callback_data": "tache_ok"
+                      }
+                    },
+                    {
+                      "text": "NON",
+                      "additionalFields": {
+                        "callback_data": "tache_PAS_OK"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          928,
+          792
+        ],
+        "id": "3ec33f8d-dfc1-45dd-9e1d-b1a44fdc1ab0",
+        "name": "Send a text message4",
+        "webhookId": "4488de6e-d295-4619-bbab-dfd73a2ecc74",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "let text = $json.text;\n\n// Nettoyage robuste caractère par caractère\nconst start = text.indexOf('{');\nconst end = text.lastIndexOf('}');\ntext = text.substring(start, end + 1);\n\nconst parsed = JSON.parse(text);\n\n// Construction du message de confirmation\n// On ajoute la ligne Heure avec une valeur par défaut\nconst confirmation = `✅ Voici ce que j'ai compris :\n\n📌 *Titre :* ${parsed.titre}\n📅 *Date :* ${parsed.date || 'Non précisée'}\n⏰ *Heure :* ${parsed.heure || 'Non précisée'}\n📝 *Description :* ${parsed.description || 'Aucune'}\n\nRéponds *OUI* pour confirmer ou *NON* pour annuler.`;\n\nreturn [{ json: { ...parsed, confirmation } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          704,
+          792
+        ],
+        "id": "3ddd7970-dfe2-4847-a6a0-312dbcb65ec5",
+        "name": "Code JS - Parse réponse audio"
+      },
+      {
+        "parameters": {
+          "resource": "callback",
+          "queryId": "={{ $('Trigger - Telegram tâches').item.json.callback_query.id }}",
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          416,
+          1088
+        ],
+        "id": "6e88d601-6df8-4c2d-acad-1bff3bb52f46",
+        "name": "Answer Query a callback",
+        "webhookId": "a83b1d91-4fcb-41e0-b466-b3020a9cce24",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "editMessageText",
+          "chatId": "={{ $('Trigger - Telegram tâches').item.json.callback_query.message.chat.id }}",
+          "messageId": "={{ $('Trigger - Telegram tâches').item.json.callback_query.message.message_id }}",
+          "replyMarkup": "=={{ JSON.stringify({\"inline_keyboard\":[]}) }}\n",
+          "text": "=={{ $('Trigger - Telegram tâches').item.json.callback_query.message.text.replace(\"Réponds OUI pour confirmer ou NON pour annuler.\", \"La tache a bien été ajoutée !\") }}",
+          "forceReply": {},
+          "replyKeyboardOptions": {},
+          "replyKeyboardRemove": {},
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1152,
+          1088
+        ],
+        "id": "5bb782f6-331b-4c22-8e6b-377e64ddde51",
+        "name": "Edit a text message1",
+        "webhookId": "2101dae5-e892-4da4-b48a-d8d4cc5fdece",
+        "credentials": {
+          "telegramApi": {
+            "id": "QOeg5qJb6B6fLLB5",
+            "name": "planification_taches_bot"
+          }
+        }
+      }
+  ],
+  "connections": {
+      "Trigger - Telegram tâches": {
+        "main": [
+          [
+            {
+              "node": "Switch - Type message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch - Type message": {
+        "main": [
+          [
+            {
+              "node": "Get a file",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Basic LLM Chain",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Send a text message2",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Basic LLM Chain1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Answer Query a callback",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Send a text message3",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get a file": {
+        "main": [
+          [
+            {
+              "node": "Transcribe a recording",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Anthropic Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Basic LLM Chain",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Basic LLM Chain": {
+        "main": [
+          [
+            {
+              "node": "Code JS - Parse réponse LLM",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Transcribe a recording": {
+        "main": [
+          [
+            {
+              "node": "Send a text message1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code JS - Parse réponse LLM": {
+        "main": [
+          [
+            {
+              "node": "Send a text message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code JS - Prépare tâche ClickUp": {
+        "main": [
+          [
+            {
+              "node": "Create a task",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create a task": {
+        "main": [
+          [
+            {
+              "node": "Edit a text message1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Basic LLM Chain1": {
+        "main": [
+          [
+            {
+              "node": "Code JS - Parse réponse audio",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Anthropic Chat Model1": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Basic LLM Chain1",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code JS - Parse réponse audio": {
+        "main": [
+          [
+            {
+              "node": "Send a text message4",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Answer Query a callback": {
+        "main": [
+          [
+            {
+              "node": "Code JS - Prépare tâche ClickUp",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+  },
+  "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "timeSavedMode": "fixed",
+      "errorWorkflow": "wg0YurkUmY4jQap6",
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false
+  }
+}

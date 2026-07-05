@@ -1,0 +1,1433 @@
+{
+  "name": "Automatic Travel Time Updates Between Google Calendar Appointments",
+  "active": false,
+  "nodes": [
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "id-1",
+                "name": "homeAddress",
+                "value": "VOTRE_ADRESSE_DOMICILE",
+                "type": "string"
+              },
+              {
+                "id": "id-3",
+                "name": "travelTimeEventName",
+                "value": "Temps de route vers",
+                "type": "string"
+              }
+            ]
+          },
+          "includeOtherFields": true,
+          "options": {}
+        },
+        "id": "7f187160-8c8d-4d85-891b-92f2765c18f1",
+        "name": "Workflow Configuration",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -1568,
+          672
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "calendar": {
+            "__rl": true,
+            "value": "={{ $('Filter').first().json.organizer.email }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "timeMin": "={{ DateTime.fromISO($json.start.dateTime).startOf('day').toISO() }}",
+          "timeMax": "={{ DateTime.fromISO($json.start.dateTime).endOf('day').toISO() }}",
+          "options": {}
+        },
+        "id": "2460bc00-db01-43fd-8b2e-b3ab140485e5",
+        "name": "Get All Events of the Day",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          -1344,
+          672
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Get all events from the previous node\nconst allEvents = $input.all();\n\n// Get the triggered event from the first node\nconst triggeredEvent = $('Filter').first().json;\n\n// Récupérez le nom dynamique de l'événement de trajet\nconst travelTimeName = $('Workflow Configuration').first().json.travelTimeEventName;\n\n// --- DÉBUT DE LA LOGIQUE PRINCIPALE ---\n\n// 1. Filtrer les événements normaux et les trier\nconst regularEvents = allEvents\n  .map(item => item.json)\n  .filter(event => !event.summary || !event.summary.includes(travelTimeName))\n  .sort((a, b) => {\n    const startA = new Date(a.start.dateTime || a.start.date);\n    const startB = new Date(b.start.dateTime || b.start.date);\n    return startA - startB;\n  });\n\n// 2. Trouver l'événement actuel et ses voisins\nconst currentEventIndex = regularEvents.findIndex(event => event.id === triggeredEvent.id);\n\nif (currentEventIndex === -1) {\n  // Si l'événement déclencheur est un temps de trajet (ex: suppression manuelle), on arrête.\n  // Vous pouvez aussi gérer sa suppression ici si vous le souhaitez.\n  console.log('L\\'événement déclencheur était un temps de trajet, arrêt.');\n  return []; // Arrête le workflow\n}\n\nconst currentEvent = regularEvents[currentEventIndex];\nconst previousEvent = currentEventIndex > 0 ? regularEvents[currentEventIndex - 1] : null;\nconst nextEvent = currentEventIndex < regularEvents.length - 1 ? regularEvents[currentEventIndex + 1] : null;\n\n// --- NOUVELLE LOGIQUE DE RECHERCHE D'ID (FIABLE) ---\n\n// Fonctions pour lire les tags dans la description\nconst getLinkedId = (description) => {\n  if (!description) return null;\n  const match = description.match(/n8n_link_id:(\\S+)/);\n  return match ? match[1] : null;\n};\n\nconst getTravelType = (description) => {\n  if (!description) return null;\n  const match = description.match(/n8n_travel_type:(\\S+)/);\n  return match ? match[1] : null;\n};\n\n// 1. Trouver TOUS les événements de trajet (peu importe l'heure)\nconst allTravelEvents = allEvents\n  .map(item => item.json)\n  .filter(event => event.summary && event.summary.includes(travelTimeName));\n\n// 2. Trouver les trajets liés à l'ÉVÉNEMENT ACTUEL\nconst linkedTravelEvents = allTravelEvents.filter(event => {\n  const linkedId = getLinkedId(event.description);\n  return linkedId === currentEvent.id;\n});\n\n// 3. Assigner les ID en fonction du type (before/after)\nlet previousTravelTimeId = linkedTravelEvents.find(event => getTravelType(event.description) === 'before')?.id || null;\nlet nextTravelTimeId = linkedTravelEvents.find(event => getTravelType(event.description) === 'after')?.id || null;\n\n// --- FIN DE LA NOUVELLE LOGIQUE ---\n\n// Return the result\nreturn [{\n  json: {\n    currentEvent,\n    previousEvent,\n    nextEvent,\n    previousTravelTimeId,\n    nextTravelTimeId\n  }\n}];"
+        },
+        "id": "12be0b09-17bd-4b4c-836b-486ad17962bb",
+        "name": "Sort Events and Find Adjacent",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -672,
+          672
+        ]
+      },
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "calendarId": {
+            "__rl": true,
+            "value": "your-email@domain.com",
+            "mode": "list",
+            "cachedResultName": "your-email@domain.com"
+          },
+          "triggerOn": "eventCreated",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleCalendarTrigger",
+        "typeVersion": 1,
+        "position": [
+          -2016,
+          576
+        ],
+        "id": "890e66fa-6340-4e46-9e82-8e43a47c76f8",
+        "name": "Google Calendar Trigger"
+      },
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "calendarId": {
+            "__rl": true,
+            "value": "your-email@domain.com",
+            "mode": "list",
+            "cachedResultName": "your-email@domain.com"
+          },
+          "triggerOn": "eventUpdated",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleCalendarTrigger",
+        "typeVersion": 1,
+        "position": [
+          -2016,
+          768
+        ],
+        "id": "e457dbaf-4e65-4bd4-8b93-cb0bc9498e34",
+        "name": "Google Calendar Trigger1"
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/distancematrix/json",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "origins",
+                "value": "={{ $('Has Previous Event?').item.json.previousEvent.location }}"
+              },
+              {
+                "name": "destinations",
+                "value": "={{ $('Has Previous Event?').item.json.currentEvent.location }}"
+              },
+              {
+                "name": "mode",
+                "value": "driving"
+              },
+              {
+                "name": "departure_time",
+                "value": "now"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth"
+        },
+        "id": "a2064f15-2ba7-406f-a166-cc1065a30685",
+        "name": "Get Travel Time Before (CREATE)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          0,
+          192
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "LKRmOkVEKeYhUgXu",
+            "name": "Google Maps API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/distancematrix/json",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "origins",
+                "value": "={{ $('Has Previous Event?').item.json.previousEvent.location }}"
+              },
+              {
+                "name": "destinations",
+                "value": "={{ $('Has Previous Event?').item.json.currentEvent.location }}"
+              },
+              {
+                "name": "mode",
+                "value": "driving"
+              },
+              {
+                "name": "departure_time",
+                "value": "now"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth"
+        },
+        "id": "cb1fc72e-9b9c-4be3-9040-fdf5096b2d28",
+        "name": "Get Travel Time Before (UPDATE)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          0,
+          0
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "LKRmOkVEKeYhUgXu",
+            "name": "Google Maps API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "start": "={{ DateTime.fromISO($('Has Previous Event?').item.json.currentEvent.start.dateTime).minus({ seconds: $('Get Travel Time Before (CREATE)').first().json.rows[0].elements[0].duration.value }).toISO() }}",
+          "end": "={{ $('Has Previous Event?').item.json.currentEvent.start.dateTime }}",
+          "additionalFields": {
+            "description": "=🚗 Trajet calculé par n8n.\n---\nn8n_link_id:{{ $('Sort Events and Find Adjacent').first().json.currentEvent.id }}\nn8n_travel_type:before",
+            "summary": "={{ $('Workflow Configuration').first().json.travelTimeEventName }} {{ $('Sort Events and Find Adjacent').first().json.currentEvent.summary }}"
+          }
+        },
+        "id": "b1c78a94-ffa6-4db0-9c5d-67ae872f5961",
+        "name": "Create Previous Travel Time Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          224,
+          192
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "eventId": "={{ $('Has Previous Event?').item.json.previousTravelTimeId }}",
+          "updateFields": {
+            "description": "=",
+            "end": "={{ $('Has Previous Event?').item.json.currentEvent.start.dateTime }}",
+            "start": "={{ DateTime.fromISO($('Has Previous Event?').item.json.currentEvent.start.dateTime).minus({ seconds: $('Get Travel Time Before (UPDATE)').first().json.rows[0].elements[0].duration.value }).toISO() }}",
+            "summary": "={{ $('Workflow Configuration').first().json.travelTimeEventName }} {{ $('Sort Events and Find Adjacent').first().json.currentEvent.summary }}"
+          }
+        },
+        "id": "b7b49d05-97ee-49ab-9906-52b2d6d16f83",
+        "name": "Update Previous Travel Time Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          224,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/distancematrix/json",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "origins",
+                "value": "={{ $('Has Next Event?').item.json.currentEvent.location }}"
+              },
+              {
+                "name": "destinations",
+                "value": "={{ $('Has Next Event?').item.json.nextEvent.location }}"
+              },
+              {
+                "name": "mode",
+                "value": "driving"
+              },
+              {
+                "name": "departure_time",
+                "value": "now"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth"
+        },
+        "id": "1291f38f-6e37-4029-8b54-624132972fc5",
+        "name": "Get Travel Time After (CREATE)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          0,
+          960
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "LKRmOkVEKeYhUgXu",
+            "name": "Google Maps API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/distancematrix/json",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "origins",
+                "value": "={{ $('Has Next Event?').item.json.currentEvent.location }}"
+              },
+              {
+                "name": "destinations",
+                "value": "={{ $('Has Next Event?').item.json.nextEvent.location }}"
+              },
+              {
+                "name": "mode",
+                "value": "driving"
+              },
+              {
+                "name": "departure_time",
+                "value": "now"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth"
+        },
+        "id": "cfbfa7df-10d6-476d-a8db-4fcc8cab3b6f",
+        "name": "Get Travel Time After (UPDATE)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          0,
+          768
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "LKRmOkVEKeYhUgXu",
+            "name": "Google Maps API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "start": "={{ $('Has Next Event?').item.json.currentEvent.end.dateTime }}",
+          "end": "={{ DateTime.fromISO($('Has Next Event?').item.json.currentEvent.end.dateTime).plus({ seconds: $('Get Travel Time After (CREATE)').first().json.rows[0].elements[0].duration.value }).toISO() }}",
+          "additionalFields": {
+            "description": "=🚗 Trajet calculé par n8n.\n---\nn8n_link_id:{{ $('Sort Events and Find Adjacent').first().json.currentEvent.id }}\nn8n_travel_type:after",
+            "summary": "={{ $('Workflow Configuration').first().json.travelTimeEventName }} {{ $('Sort Events and Find Adjacent').first().json.currentEvent.summary }}"
+          }
+        },
+        "id": "3eae33e8-a0b1-42ee-be20-2c1924303831",
+        "name": "Create Next Travel Time Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          224,
+          960
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "eventId": "={{ $('Has Next Event?').item.json.nextTravelTimeId }}",
+          "updateFields": {
+            "description": "={{ 'Travel time: ' + Math.round($('Get Travel Time After (UPDATE)').first().json.rows[0].elements[0].duration.value / 60) + ' minutes\\nFrom: ' + $('Has Next Event?').item.json.currentEvent.location + '\\nTo: ' + $('Has Next Event?').item.json.nextEvent.location }}",
+            "end": "={{ DateTime.fromISO($('Has Next Event?').item.json.currentEvent.end.dateTime).plus({ seconds: $('Get Travel Time After (UPDATE)').first().json.rows[0].elements[0].duration.value }).toISO() }}",
+            "start": "={{ $('Has Next Event?').item.json.currentEvent.end.dateTime }}",
+            "summary": "={{ $('Workflow Configuration').first().json.travelTimeEventName }} {{ $('Sort Events and Find Adjacent').first().json.currentEvent.summary }}"
+          }
+        },
+        "id": "8aee318f-c7d9-4646-8b13-c8aa86f73e27",
+        "name": "Update Next Travel Time Event",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          224,
+          768
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "20ebe215-3890-4259-8eee-43fd20befd13",
+                "leftValue": "={{ $json.summary }}",
+                "rightValue": "Temps de route",
+                "operator": {
+                  "type": "string",
+                  "operation": "notContains"
+                }
+              },
+              {
+                "id": "c2c87eb2-8d57-4a07-822b-22351a583aa4",
+                "leftValue": "={{ $json.location != null && $json.location != \"\" }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              },
+              {
+                "id": "1d424db0-7c27-453f-b3cf-e70aa5d78b4c",
+                "leftValue": "={{ $json.location }}",
+                "rightValue": "^https?:\\/\\/",
+                "operator": {
+                  "type": "string",
+                  "operation": "notRegex"
+                }
+              },
+              {
+                "id": "bcdb67f5-d455-4daa-9f7a-59170bd36275",
+                "leftValue": "={{ $json.location }}",
+                "rightValue": "(zoom|teams|meet|télétravail|home office|domicile|à la maison|visio|call)",
+                "operator": {
+                  "type": "string",
+                  "operation": "notRegex"
+                }
+              },
+              {
+                "id": "76b27767-d43d-4797-93b1-614d46927349",
+                "leftValue": "={{ $json.location }}",
+                "rightValue": "\\d",
+                "operator": {
+                  "type": "string",
+                  "operation": "regex"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 2.3,
+        "position": [
+          -1792,
+          672
+        ],
+        "id": "ed6bcc91-3c05-4c20-92ce-fd833aa698d8",
+        "name": "Filter"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 1,
+              "leftValue": "",
+              "caseSensitive": false,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "id-1",
+                "leftValue": "={{ $json.previousEvent }}",
+                "operator": {
+                  "type": "object",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "id": "deea8fac-c828-4e5b-9752-84c30418cee3",
+        "name": "Has Previous Event?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -448,
+          288
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 1,
+              "leftValue": "",
+              "caseSensitive": false,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "id-1",
+                "leftValue": "={{ $json.previousTravelTimeId }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "id": "c0567cd6-71e6-4cfc-b86a-b0be418752d5",
+        "name": "Has Previous Travel? (Event Exists)",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -224,
+          96
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 1,
+              "leftValue": "",
+              "caseSensitive": false,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "id-1",
+                "leftValue": "={{ $json.previousTravelTimeId }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "id": "5a301329-23b4-4869-8bb9-83dd77c60caf",
+        "name": "Has Previous Travel? (No Event)",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -224,
+          480
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "delete",
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "eventId": "={{ $('Sort Events and Find Adjacent').first().json.previousTravelTimeId }}",
+          "options": {}
+        },
+        "id": "6db05e5b-d8df-4980-8ed0-a5524baaebe7",
+        "name": "Delete Previous Travel Time (No Event)",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          384
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 1,
+              "leftValue": "",
+              "caseSensitive": false,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "id-1",
+                "leftValue": "={{ $json.nextEvent }}",
+                "operator": {
+                  "type": "object",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "id": "75f26291-de2b-4fe7-ae86-5717baa5afa1",
+        "name": "Has Next Event?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -448,
+          1056
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 1,
+              "leftValue": "",
+              "caseSensitive": false,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "id-1",
+                "leftValue": "={{ $json.nextTravelTimeId }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "id": "4447bc64-d03f-4153-a2b3-6eeaf0747817",
+        "name": "Has Next Travel? (Event Exists)",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -224,
+          864
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 1,
+              "leftValue": "",
+              "caseSensitive": false,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "id-1",
+                "leftValue": "={{ $json.nextTravelTimeId }}",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "id": "96066fa1-e45b-4352-af32-4c9bf44a2d5e",
+        "name": "Has Next Travel? (No Event)",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -224,
+          1248
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "delete",
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "eventId": "={{ $('Sort Events and Find Adjacent').first().json.nextTravelTimeId }}",
+          "options": {}
+        },
+        "id": "b7be306c-d629-457b-a7b0-8ac0d05b1663",
+        "name": "Delete Next Travel Time (No Event)",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          1152
+        ]
+      },
+      {
+        "parameters": {
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "start": "={{ DateTime.fromISO($('Has Previous Event?').item.json.currentEvent.start.dateTime).minus({ seconds: $('Get Travel Time Before (CREATE)').first().json.rows[0].elements[0].duration.value }).toISO() }}",
+          "end": "={{ $('Has Previous Event?').item.json.currentEvent.start.dateTime }}",
+          "additionalFields": {
+            "description": "=🚗 Trajet calculé par n8n.\n---\nn8n_link_id:{{ $('Sort Events and Find Adjacent').first().json.currentEvent.id }}\nn8n_travel_type:before",
+            "summary": "={{ $('Workflow Configuration').first().json.travelTimeEventName }} {{ $('Sort Events and Find Adjacent').first().json.currentEvent.summary }}"
+          }
+        },
+        "id": "4b164deb-c638-4887-8ae8-11fc91812b54",
+        "name": "Create Previous Travel Time Event1",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          448,
+          384
+        ]
+      },
+      {
+        "parameters": {
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "start": "={{ DateTime.fromISO($('Has Previous Event?').item.json.currentEvent.start.dateTime).minus({ seconds: $('Get Travel Time Before (CREATE)1').first().json.rows[0].elements[0].duration.value }).minus({ minutes: 5 }).toISO() }}",
+          "end": "={{ DateTime.fromISO($('Has Previous Event?').item.json.currentEvent.start.dateTime).minus({ minutes: 5 }).toISO() }}",
+          "additionalFields": {
+            "description": "=🚗 Trajet calculé par n8n.\n---\nn8n_link_id:{{ $('Sort Events and Find Adjacent').first().json.currentEvent.id }}\nn8n_travel_type:before",
+            "summary": "={{ $('Workflow Configuration').first().json.travelTimeEventName }} {{ $('Sort Events and Find Adjacent').first().json.currentEvent.summary }}"
+          }
+        },
+        "id": "4dae005d-f436-4ea2-9b5e-01359a42ff04",
+        "name": "Create Previous Travel Time Event2",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          448,
+          576
+        ]
+      },
+      {
+        "parameters": {
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "start": "={{ $('Has Next Event?').item.json.currentEvent.end.dateTime }}",
+          "end": "={{ DateTime.fromISO($('Has Next Event?').item.json.currentEvent.end.dateTime).plus({ seconds: $('Get Travel Time After (CREATE)').first().json.rows[0].elements[0].duration.value }).toISO() }}",
+          "additionalFields": {
+            "description": "=🚗 Trajet calculé par n8n.\n---\nn8n_link_id:{{ $('Sort Events and Find Adjacent').first().json.currentEvent.id }}\nn8n_travel_type:after",
+            "summary": "={{ $('Workflow Configuration').first().json.travelTimeEventName }} {{ $('Sort Events and Find Adjacent').first().json.currentEvent.summary }}"
+          }
+        },
+        "id": "61997079-0a08-4fdc-bd34-7a7e047d6aa2",
+        "name": "Create Next Travel Time Event1",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          448,
+          1152
+        ]
+      },
+      {
+        "parameters": {
+          "calendar": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $('Filter').first().json.organizer.email }}"
+          },
+          "start": "={{ DateTime.fromISO($('Has Next Event?').item.json.currentEvent.end.dateTime).plus({ minutes: 5 }).toISO() }}",
+          "end": "={{ DateTime.fromISO($('Has Next Event?').item.json.currentEvent.end.dateTime).plus({ seconds: $('Get Travel Time After (CREATE)2').first().json.rows[0].elements[0].duration.value }).plus({ minutes: 5 }).toISO() }}",
+          "additionalFields": {
+            "description": "=🚗 Trajet calculé par n8n.\n---\nn8n_link_id:{{ $('Sort Events and Find Adjacent').first().json.currentEvent.id }}\nn8n_travel_type:after",
+            "summary": "={{ $('Workflow Configuration').first().json.travelTimeEventName }} {{ $('Sort Events and Find Adjacent').first().json.currentEvent.summary }}"
+          }
+        },
+        "id": "9e407bda-e757-4236-8fe3-19b51d212004",
+        "name": "Create Next Travel Time Event2",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          448,
+          1344
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/distancematrix/json",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "origins",
+                "value": "={{ $json.adresse_domicile }}"
+              },
+              {
+                "name": "destinations",
+                "value": "={{ $('Has Previous Event?').item.json.currentEvent.location }}"
+              },
+              {
+                "name": "mode",
+                "value": "driving"
+              },
+              {
+                "name": "departure_time",
+                "value": "now"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth"
+        },
+        "id": "95c564a1-c80f-41b5-802d-367648d1d90c",
+        "name": "Get Travel Time Before (CREATE)1",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          224,
+          576
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "LKRmOkVEKeYhUgXu",
+            "name": "Google Maps API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/distancematrix/json",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "origins",
+                "value": "={{ $('Has Previous Event?').item.json.previousEvent.location }}"
+              },
+              {
+                "name": "destinations",
+                "value": "={{ $('Has Previous Event?').item.json.currentEvent.location }}"
+              },
+              {
+                "name": "mode",
+                "value": "driving"
+              },
+              {
+                "name": "departure_time",
+                "value": "now"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth"
+        },
+        "id": "f25487a5-7ffe-464e-9ff0-aa20aab010c4",
+        "name": "Get Travel Time Before (CREATE)2",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          224,
+          384
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "LKRmOkVEKeYhUgXu",
+            "name": "Google Maps API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/distancematrix/json",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "origins",
+                "value": "={{ $('Has Next Event?').item.json.currentEvent.location }}"
+              },
+              {
+                "name": "destinations",
+                "value": "={{ $('Has Next Event?').item.json.nextEvent.location }}"
+              },
+              {
+                "name": "mode",
+                "value": "driving"
+              },
+              {
+                "name": "departure_time",
+                "value": "now"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth"
+        },
+        "id": "1e3f742a-a6aa-4500-8ca4-9725896a9d28",
+        "name": "Get Travel Time After (CREATE)1",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          224,
+          1152
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "LKRmOkVEKeYhUgXu",
+            "name": "Google Maps API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/distancematrix/json",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "origins",
+                "value": "={{ $('Has Next Event?').item.json.currentEvent.location }}"
+              },
+              {
+                "name": "destinations",
+                "value": "={{ $json.adresse_domicile }}"
+              },
+              {
+                "name": "mode",
+                "value": "driving"
+              },
+              {
+                "name": "departure_time",
+                "value": "now"
+              }
+            ]
+          },
+          "options": {},
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth"
+        },
+        "id": "e35faa46-0b2e-4e8e-a703-eb88d57c1302",
+        "name": "Get Travel Time After (CREATE)2",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          224,
+          1344
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "LKRmOkVEKeYhUgXu",
+            "name": "Google Maps API Key"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "value": "hVYokOVUe9qJcKbk",
+            "mode": "list",
+            "cachedResultName": "liste domicile",
+            "cachedResultUrl": "/projects/BBiBSib6qrgveAXG/datatables/hVYokOVUe9qJcKbk"
+          },
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "email",
+                "keyValue": "={{ $('Filter').first().json.organizer.email }}"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          576
+        ],
+        "id": "de89b683-64ef-455e-9ccb-26ac52d3d42e",
+        "name": "Get row(s)"
+      },
+      {
+        "parameters": {
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "value": "hVYokOVUe9qJcKbk",
+            "mode": "list",
+            "cachedResultName": "liste domicile",
+            "cachedResultUrl": "/projects/BBiBSib6qrgveAXG/datatables/hVYokOVUe9qJcKbk"
+          },
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "email",
+                "keyValue": "={{ $('Filter').first().json.organizer.email }}"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          1344
+        ],
+        "id": "ec6b7c33-eeda-40b4-84c4-ddf1a9a84b75",
+        "name": "Get row(s)1"
+      },
+      {
+        "parameters": {
+          "operation": "getAll",
+          "calendar": {
+            "__rl": true,
+            "value": "={{ $('Filter').first().json.organizer.email }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "timeMin": "2020-11-09T22:28:31",
+          "timeMax": "2040-11-16T22:28:31",
+          "options": {
+            "query": "=n8n_link_id:{{ $('Filter').first().json.id }}"
+          }
+        },
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          -896,
+          560
+        ],
+        "id": "a65f8208-be19-4d78-a097-160216017c43",
+        "name": "Find Old Linked Travel"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "421110ac-5be4-4b3e-9d60-cae2ec0f83b8",
+                "leftValue": "={{ $meta.triggerNodeName }}",
+                "rightValue": "Google Calendar Trigger",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          -1120,
+          672
+        ],
+        "id": "ffd3ce03-e745-47fa-8ab6-59703b152a2a",
+        "name": "If"
+      }
+  ],
+  "connections": {
+      "Workflow Configuration": {
+        "main": [
+          [
+            {
+              "node": "Get All Events of the Day",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get All Events of the Day": {
+        "main": [
+          [
+            {
+              "node": "If",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Calendar Trigger": {
+        "main": [
+          [
+            {
+              "node": "Filter",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Google Calendar Trigger1": {
+        "main": [
+          [
+            {
+              "node": "Filter",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sort Events and Find Adjacent": {
+        "main": [
+          [
+            {
+              "node": "Has Previous Event?",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Has Next Event?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Travel Time Before (CREATE)": {
+        "main": [
+          [
+            {
+              "node": "Create Previous Travel Time Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Travel Time Before (UPDATE)": {
+        "main": [
+          [
+            {
+              "node": "Update Previous Travel Time Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Travel Time After (CREATE)": {
+        "main": [
+          [
+            {
+              "node": "Create Next Travel Time Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Travel Time After (UPDATE)": {
+        "main": [
+          [
+            {
+              "node": "Update Next Travel Time Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter": {
+        "main": [
+          [
+            {
+              "node": "Workflow Configuration",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Previous Event?": {
+        "main": [
+          [
+            {
+              "node": "Has Previous Travel? (Event Exists)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Has Previous Travel? (No Event)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Previous Travel? (Event Exists)": {
+        "main": [
+          [
+            {
+              "node": "Get Travel Time Before (UPDATE)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get Travel Time Before (CREATE)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Previous Travel? (No Event)": {
+        "main": [
+          [
+            {
+              "node": "Delete Previous Travel Time (No Event)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get row(s)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Next Event?": {
+        "main": [
+          [
+            {
+              "node": "Has Next Travel? (Event Exists)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Has Next Travel? (No Event)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Next Travel? (Event Exists)": {
+        "main": [
+          [
+            {
+              "node": "Get Travel Time After (UPDATE)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get Travel Time After (CREATE)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Next Travel? (No Event)": {
+        "main": [
+          [
+            {
+              "node": "Delete Next Travel Time (No Event)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get row(s)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delete Previous Travel Time (No Event)": {
+        "main": [
+          [
+            {
+              "node": "Get Travel Time Before (CREATE)2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Delete Next Travel Time (No Event)": {
+        "main": [
+          [
+            {
+              "node": "Get Travel Time After (CREATE)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Travel Time Before (CREATE)1": {
+        "main": [
+          [
+            {
+              "node": "Create Previous Travel Time Event2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Travel Time Before (CREATE)2": {
+        "main": [
+          [
+            {
+              "node": "Create Previous Travel Time Event1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Travel Time After (CREATE)1": {
+        "main": [
+          [
+            {
+              "node": "Create Next Travel Time Event1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Travel Time After (CREATE)2": {
+        "main": [
+          [
+            {
+              "node": "Create Next Travel Time Event2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get row(s)": {
+        "main": [
+          [
+            {
+              "node": "Get Travel Time Before (CREATE)1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get row(s)1": {
+        "main": [
+          [
+            {
+              "node": "Get Travel Time After (CREATE)2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Old Linked Travel": {
+        "main": [
+          [
+            {
+              "node": "Sort Events and Find Adjacent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If": {
+        "main": [
+          [
+            {
+              "node": "Find Old Linked Travel",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Sort Events and Find Adjacent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+  },
+  "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false
+  }
+}

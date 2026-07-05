@@ -1,0 +1,146 @@
+{
+  "name": "ALERTE CPA GOOGLE ADS",
+  "active": true,
+  "nodes": [
+    {
+      "id": "a2e04a7b-aafd-44c8-9048-9f3e4aca346c",
+      "name": "Trigger - Alerte CPA toutes les 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "542b4612-09ee-4a89-ab95-ea0e999cb924",
+      "name": "Google Ads - Stats du jour",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        450,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://googleads.googleapis.com/v23/customers/YOUR_GOOGLE_ADS_CUSTOMER_ID/googleAds:searchStream",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleAdsOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "developer-token",
+              "value": "YOUR_GOOGLE_ADS_DEVELOPER_TOKEN"
+            },
+            {
+              "name": "login-customer-id",
+              "value": "YOUR_GOOGLE_ADS_CUSTOMER_ID"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\": \"SELECT campaign.name, metrics.cost_micros, metrics.clicks, metrics.conversions, metrics.cost_per_conversion FROM campaign WHERE segments.date DURING TODAY AND campaign.status = 'ENABLED'\"}",
+        "options": {}
+      },
+      "credentials": {
+        "googleAdsOAuth2Api": {
+          "id": "sSvALaf7wjlxNhHQ",
+          "name": "Google Ads account"
+        }
+      }
+    },
+    {
+      "id": "6a47f806-9dbd-4d09-8a31-2cbe57ec12b0",
+      "name": "Code JS - Calcul CPA et dedup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\nconst results = $input.first().json.results || [];\nconst staticData = $getWorkflowStaticData('global');\n\n// Reset daily\nconst today = new Date().toISOString().split('T')[0];\nif (staticData.lastResetDate !== today) {\n  staticData.alertedCampaigns = [];\n  staticData.lastResetDate = today;\n}\nif (!Array.isArray(staticData.alertedCampaigns)) staticData.alertedCampaigns = [];\n\nconst campaignsToAlert = [];\n\nfor (const r of results) {\n  const campaignName = r.campaign.name;\n  const cost = (r.metrics.costMicros || 0) / 1_000_000;\n  const conversions = r.metrics.conversions || 0;\n  \n  if (conversions === 0) continue;\n  \n  const cpa = cost / conversions;\n  \n  if (cpa > 100 && !staticData.alertedCampaigns.includes(campaignName)) {\n    campaignsToAlert.push({\n      campagne: campaignName,\n      cpa: cpa.toFixed(2),\n      conversions: conversions,\n      depense: cost.toFixed(2)\n    });\n    staticData.alertedCampaigns.push(campaignName);\n  }\n}\n\nif (campaignsToAlert.length === 0) return [];\n\nreturn campaignsToAlert.map(c => ({ json: c }));\n"
+      },
+      "notes": "Calcule le CPA par campagne, filtre > 100€ et dédoublonne via staticData journalier"
+    },
+    {
+      "id": "14069f8c-db82-4c58-b8fe-d5b9fed4be7b",
+      "name": "Telegram - Alerte CPA",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        850,
+        300
+      ],
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🚨 <b>ALERTE CPA</b>\n\nCampagne : <b>{{ $json.campagne }}</b>\nCPA actuel : <b>{{ $json.cpa }}€</b> (seuil : 100€)\nConversions aujourd'hui : {{ $json.conversions }}\nDépense : {{ $json.depense }}€\n\n👉 Action recommandée : vérifier les enchères",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      },
+      "webhookId": "0fd5335a-be08-460e-9594-c8e42213eb5e"
+    }
+  ],
+  "connections": {
+    "Trigger - Alerte CPA toutes les 6h": {
+      "main": [
+        [
+          {
+            "node": "Google Ads - Stats du jour",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Ads - Stats du jour": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Calcul CPA et dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Calcul CPA et dedup": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Alerte CPA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  }
+}

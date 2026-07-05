@@ -1,0 +1,94 @@
+{
+  "name": "Workflow 1 : Générer le lien Iframe Synchronie",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "signature-request",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "0782d8c1-aa86-416f-aed8-e925b59d752f",
+      "name": "Webhook - Demande lien Synchronie",
+      "webhookId": "fe24def9-75d2-4a79-9eb0-0b8d970058dd",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sign.emafuites.fr/api/submissions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"template_id\": 1,\n  \"send_email\": false,\n  \"submitters\": [\n    {\n      \"name\": \"{{ $node['Webhook - Demande lien Synchronie'].json.body.nom }}\",\n      \"email\": \"{{ $node['Webhook - Demande lien Synchronie'].json.body.email }}\",\n      \"external_id\": \"{{ $node['Webhook - Demande lien Synchronie'].json.body.notion_page_id }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [208, 0],
+      "id": "22216f5e-f57a-41a9-8e9d-1d978f947290",
+      "name": "API Synchronie - Génère iframe",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "EXET2aKwHrRBYJqc",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"url\": \"https://sign.emafuites.fr/s/{{ $node['API Synchronie - Génère iframe'].json.slug }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [416, 0],
+      "id": "a060efa6-1acb-4204-aac9-467ef3c37a87",
+      "name": "Webhook - Répond lien Synchronie"
+    }
+  ],
+  "connections": {
+    "Webhook - Demande lien Synchronie": {
+      "main": [
+        [
+          {
+            "node": "API Synchronie - Génère iframe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Synchronie - Génère iframe": {
+      "main": [
+        [
+          {
+            "node": "Webhook - Répond lien Synchronie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

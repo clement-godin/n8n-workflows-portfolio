@@ -1,0 +1,131 @@
+{
+  "name": "SUPPRESSION DES LABELS GMAIL VIDES",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "fb39292d-d49b-48c4-8489-8fa08d07ba93",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [208, 0],
+      "id": "4ee63022-d0b0-4c01-b77b-4640e2afacab",
+      "name": "Get many labels",
+      "webhookId": "63304afb-cc9a-404e-853e-f6e8607264bb",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UDrHZnkx1bluaTgc",
+          "name": "COMPTE GMAIL MEA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "get",
+        "labelId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [432, 0],
+      "id": "a2bbe284-c74a-4c8c-8ac3-4a8842f7618f",
+      "name": "Get a label info",
+      "webhookId": "308e691d-faed-4311-be02-b9778a3ccb20",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UDrHZnkx1bluaTgc",
+          "name": "COMPTE GMAIL MEA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "75e1076d-3de1-457b-a417-6ffdfe5aed90",
+              "leftValue": "={{ $json.messagesTotal }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "e3cc81a8-4abd-4dbf-898f-d4edb515c77f",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "=system",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [640, 0],
+      "id": "7f03b046-8855-4fd6-b525-b1faf041b5ab",
+      "name": "Si - Label vide"
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "delete",
+        "labelId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [848, 0],
+      "id": "ae6faffb-195b-4c99-b5d3-32158ed88979",
+      "name": "Delete a label",
+      "webhookId": "66d7dde4-747d-42ad-9c8e-149f89b0568d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "UDrHZnkx1bluaTgc",
+          "name": "COMPTE GMAIL MEA"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [[{ "node": "Get many labels", "type": "main", "index": 0 }]]
+    },
+    "Get many labels": {
+      "main": [[{ "node": "Get a label info", "type": "main", "index": 0 }]]
+    },
+    "Get a label info": {
+      "main": [[{ "node": "Si - Label vide", "type": "main", "index": 0 }]]
+    },
+    "Si - Label vide": {
+      "main": [[{ "node": "Delete a label", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

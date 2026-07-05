@@ -1,0 +1,161 @@
+{
+  "name": "RELANCE DEVIS ENVOYE 24H",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "9fe95433-aac9-4d01-9954-8b3231daf910",
+      "name": "Trigger - Relance devis 24h"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filterGroups\": [\n    {\n      \"filters\": [\n        {\n          \"propertyName\": \"createdate\",\n          \"operator\": \"GTE\",\n          \"value\": \"{{ $now.minus({days: 1}).startOf('day').toMillis() }}\"\n        },\n        {\n          \"propertyName\": \"createdate\",\n          \"operator\": \"LT\",\n          \"value\": \"{{ $now.startOf('day').toMillis() }}\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [208, 0],
+      "id": "457a9b0c-93d1-4946-bf2c-334460ccdb57",
+      "name": "API HubSpot - Récupère devis",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "get",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.results[0].id }}",
+          "mode": "id"
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [416, 0],
+      "id": "bc23d7ca-f640-495c-8210-cf78ef3a0e5a",
+      "name": "HubSpot - Récupère deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "operation": "get",
+        "contactId": {
+          "__rl": true,
+          "value": "={{ $json.associations.associatedVids[0] }}",
+          "mode": "id"
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [624, 0],
+      "id": "b70f6777-902d-45ef-9d41-d9803bd721ee",
+      "name": "HubSpot - Récupère contact",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "call",
+        "from": "+33600000000",
+        "to": "={{ $json.properties.hs_searchable_calculated_phone_number.value }}",
+        "message": "brj",
+        "options": {
+          "statusCallback": ""
+        }
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [832, 0],
+      "id": "9d688437-834b-47b9-8ad0-0dd500275669",
+      "name": "API Twilio - Appel relance devis",
+      "credentials": {
+        "twilioApi": {
+          "id": "NdJKnqLRWuEnESVv",
+          "name": "Twilio account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Relance devis 24h": {
+      "main": [
+        [
+          {
+            "node": "API HubSpot - Récupère devis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API HubSpot - Récupère devis": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Récupère deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Récupère deal": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Récupère contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Récupère contact": {
+      "main": [
+        [
+          {
+            "node": "API Twilio - Appel relance devis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["HUBSPOT", "CRM & VENTES"]
+}

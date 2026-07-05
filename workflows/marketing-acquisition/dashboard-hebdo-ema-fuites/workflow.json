@@ -1,0 +1,253 @@
+{
+  "name": "DASHBOARD HEBDO EMA FUITES",
+  "active": false,
+  "nodes": [
+    {
+      "id": "e347a2d5-1d05-4fc2-ad36-257aa9eb2349",
+      "name": "Trigger - Dashboard hebdo lundi",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "daysOfTheWeek": [
+                1
+              ],
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d4ee4f7e-eb00-4546-b298-7a1ffafbe78a",
+      "name": "Google Ads - Stats 7 jours",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        450,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://googleads.googleapis.com/v23/customers/YOUR_GOOGLE_ADS_CUSTOMER_ID/googleAds:searchStream",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleAdsOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "developer-token",
+              "value": "YOUR_GOOGLE_ADS_DEVELOPER_TOKEN"
+            },
+            {
+              "name": "login-customer-id",
+              "value": "YOUR_GOOGLE_ADS_CUSTOMER_ID"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\": \"SELECT campaign.name, metrics.cost_micros, metrics.clicks, metrics.conversions, metrics.cost_per_conversion FROM campaign WHERE segments.date DURING LAST_7_DAYS AND campaign.status = 'ENABLED'\"}",
+        "options": {}
+      },
+      "credentials": {
+        "googleAdsOAuth2Api": {
+          "id": "sSvALaf7wjlxNhHQ",
+          "name": "Google Ads account"
+        }
+      }
+    },
+    {
+      "id": "8937e74a-481d-4465-9d1c-9d63c4713b62",
+      "name": "HubSpot - Deals semaine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        450,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"filterGroups\": [{\"filters\": [{\"propertyName\": \"createdate\", \"operator\": \"GTE\", \"value\": \"1780609636555\"}]}], \"properties\": [\"dealname\", \"dealstage\", \"createdate\", \"closedate\"], \"sorts\": [{\"propertyName\": \"createdate\", \"direction\": \"DESCENDING\"}], \"limit\": 200}",
+        "options": {}
+      },
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "id": "f0dc9edc-5f23-4d06-9d04-0594614aaad1",
+      "name": "Code JS - Agrège et formate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ],
+      "parameters": {
+        "jsCode": "\n// Aggregate all data into dashboard report\nconst gadsData = $('Google Ads - Stats 7 jours').first().json.results || [];\nconst hsDeals = $('HubSpot - Deals semaine').first().json.results || [];\n\n// === GOOGLE ADS ===\nlet totalDepense = 0, totalClics = 0, totalConversions = 0;\nconst campaignsData = [];\n\nfor (const r of gadsData) {\n  const cout = (r.metrics.costMicros || 0) / 1_000_000;\n  const conv = r.metrics.conversions || 0;\n  const clics = r.metrics.clicks || 0;\n  const cpa = conv > 0 ? cout / conv : null;\n  \n  totalDepense += cout;\n  totalClics += clics;\n  totalConversions += conv;\n  \n  campaignsData.push({\n    name: r.campaign.name,\n    cout: cout,\n    conversions: conv,\n    cpa: cpa\n  });\n}\n\nconst cpaMoyen = totalConversions > 0 ? totalDepense / totalConversions : null;\n\n// Sort by CPA to find best and worst\nconst withCpa = campaignsData.filter(c => c.cpa !== null);\nwithCpa.sort((a, b) => a.cpa - b.cpa);\nconst bestCpa = withCpa[0] || null;\nconst worstCpa = withCpa[withCpa.length - 1] || null;\n\n// === HUBSPOT ===\nconst totalLeads = hsDeals.length;\nconst dealsCreated = hsDeals.length;\nconst dealsClosed = hsDeals.filter(d => d.properties?.dealstage === '3422415597').length;\nconst dealsPerdus = hsDeals.filter(d => d.properties?.dealstage === '3422415598').length;\nconst devisEnvoyes = hsDeals.filter(d => ['qualifiedtobuy', 'presentationscheduled'].includes(d.properties?.dealstage)).length;\n\n// === WEEK NUMBER ===\nconst now = new Date();\nconst startOfYear = new Date(now.getFullYear(), 0, 1);\nconst weekNum = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);\n\nconst dashboardRow = {\n  semaine: `S${weekNum}-${now.getFullYear()}`,\n  date: now.toLocaleDateString('fr-FR'),\n  depense_ads: totalDepense.toFixed(2),\n  clics: totalClics,\n  conversions: totalConversions,\n  cpa_moyen: cpaMoyen ? cpaMoyen.toFixed(2) : 'N/A',\n  leads_total: totalLeads,\n  deals_clos: dealsClosed,\n  deals_perdus: dealsPerdus,\n  devis_envoyes: devisEnvoyes,\n  best_campagne: bestCpa ? bestCpa.name : 'N/A',\n  best_cpa: bestCpa ? bestCpa.cpa.toFixed(2) : 'N/A',\n  worst_campagne: worstCpa ? worstCpa.name : 'N/A',\n  worst_cpa: worstCpa ? worstCpa.cpa.toFixed(2) : 'N/A'\n};\n\nconst telegramMsg = [\n  `📊 <b>RAPPORT SEMAINE S${weekNum}/${now.getFullYear()}</b>`,\n  ``,\n  `💰 <b>Google Ads</b>`,\n  `• Dépense : ${totalDepense.toFixed(2)}€`,\n  `• Clics : ${totalClics}`,\n  `• Conversions : ${totalConversions}`,\n  `• CPA moyen : ${cpaMoyen ? cpaMoyen.toFixed(2) + '€' : 'N/A'}`,\n  ``,\n  `📋 <b>Leads & Deals</b>`,\n  `• Nouveaux leads : ${totalLeads}`,\n  `• Devis envoyés : ${devisEnvoyes}`,\n  `• Deals closés : ${dealsClosed} ✅`,\n  `• Deals perdus : ${dealsPerdus} ❌`,\n  ``,\n  bestCpa ? `🏆 Meilleur CPA : ${bestCpa.name} — ${bestCpa.cpa.toFixed(2)}€` : '',\n  worstCpa ? `⚠️ Pire CPA : ${worstCpa.name} — ${worstCpa.cpa.toFixed(2)}€` : ''\n].filter(l => l !== '').join('\\n');\n\nreturn [{ json: { dashboardRow, telegramMsg } }];\n"
+      },
+      "notes": "Agrège données Google Ads + HubSpot et prépare le rapport Telegram"
+    },
+    {
+      "id": "aa862d84-61e3-427b-924a-358c7c33aca2",
+      "name": "Sheets - Enregistre dashboard",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "SHEETS_LEADS_ID_A_CONFIGURER",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "DASHBOARD",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Semaine": "={{ $json.dashboardRow.semaine }}",
+            "Date": "={{ $json.dashboardRow.date }}",
+            "Dépense Ads": "={{ $json.dashboardRow.depense_ads }}",
+            "Clics": "={{ $json.dashboardRow.clics }}",
+            "Conversions": "={{ $json.dashboardRow.conversions }}",
+            "CPA Moyen": "={{ $json.dashboardRow.cpa_moyen }}",
+            "Leads Total": "={{ $json.dashboardRow.leads_total }}",
+            "Deals Closés": "={{ $json.dashboardRow.deals_clos }}",
+            "Deals Perdus": "={{ $json.dashboardRow.deals_perdus }}",
+            "Devis Envoyés": "={{ $json.dashboardRow.devis_envoyes }}",
+            "Best Campagne": "={{ $json.dashboardRow.best_campagne }}",
+            "Best CPA": "={{ $json.dashboardRow.best_cpa }}",
+            "Worst Campagne": "={{ $json.dashboardRow.worst_campagne }}",
+            "Worst CPA": "={{ $json.dashboardRow.worst_cpa }}"
+          }
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      },
+      "notes": "⚠️ À configurer: remplacer SHEETS_LEADS_ID_A_CONFIGURER par l'ID du Google Sheet dashboard"
+    },
+    {
+      "id": "8c47352d-f253-4642-995d-447908506666",
+      "name": "Telegram - Rapport hebdo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.telegramMsg }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      },
+      "webhookId": "bca7c9e4-4923-4175-88eb-7e5606fa175d"
+    }
+  ],
+  "connections": {
+    "Trigger - Dashboard hebdo lundi": {
+      "main": [
+        [
+          {
+            "node": "Google Ads - Stats 7 jours",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HubSpot - Deals semaine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Ads - Stats 7 jours": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Agrège et formate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Deals semaine": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Agrège et formate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Agrège et formate": {
+      "main": [
+        [
+          {
+            "node": "Sheets - Enregistre dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets - Enregistre dashboard": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Rapport hebdo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  }
+}

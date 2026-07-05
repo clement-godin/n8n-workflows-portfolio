@@ -1,0 +1,492 @@
+{
+  "name": "Workflow 1 Scraping Plombiers",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-608, 384],
+      "id": "35d6e26b-135b-47fa-a798-be857f9af28d",
+      "name": "Trigger - Scraping plombiers"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"textQuery\": \"{{ $json.ville }}\",\n  \"languageCode\": \"fr\"\n}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [960, 288],
+      "id": "7da2324b-dddf-449d-9680-87ef6db82cbf",
+      "name": "API Google - Places textsearch",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ElbYVaRQ7CxsEi1r",
+          "name": "Google Places API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\n\n\nfor (const item of $input.all()) {\n  const communes = Array.isArray(item.json) ? item.json : [item.json];\n  for (const commune of communes) {\n    const nom = commune.nom || '';\n    const pop = commune.population || 0;\n    if (nom && pop >= 500) {\n      results.push({\n        json: {\n          ville: `plombier ${nom} France`\n        }\n      });\n    }\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [512, 288],
+      "id": "c819a2f8-0ce0-4e8e-bb0c-97adb9205e58",
+      "name": "Code JS - Formate requêtes villes"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aplatir tous les résultats et dédupliquer par numéro de téléphone\nconst seen = new Set();\nconst results = [];\n\nfor (const item of $input.all()) {\n  const places = item.json.places || [];\n  for (const place of places) {\n    const phone = place.nationalPhoneNumber || '';\n    const name = place.displayName?.text || '';\n    const address = place.formattedAddress || '';\n    const website = place.websiteUri || '';\n\n    // Ignorer si pas de téléphone ou déjà vu\n    if (!phone || seen.has(phone)) continue;\n    // Ignorer si adresse hors 59/62\n    if (!address.match(/\\b(59|62)\\d{3}\\b/)) continue;\n\n    seen.add(phone);\n    results.push({\n      json: {\n        nom: name,\n        telephone: phone,\n        adresse: address,\n        website: website,\n        email: '',\n        source: 'Google Places'\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1184, 288],
+      "id": "4fd97622-93e7-4883-a800-bb776b6e0356",
+      "name": "Code JS - Dédoublonne résultats"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.website }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-608, 1024],
+      "id": "8bd3987a-9d3f-4119-a3ce-5a1c69f7e618",
+      "name": "API HTTP - Scrape site web",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map((item, index) => {\n  const html = item.json.data || item.json.body || '';\n  const emailRegex = /[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}/g;\n  const emails = html.match(emailRegex) || [];\n\n  const filtered = emails.filter(e =>\n    !e.includes('sentry') &&\n    !e.includes('example') &&\n    !e.includes('@2x') &&\n    !e.includes('.png') &&\n    !e.includes('.jpg') &&\n    !e.includes('wixpress') &&\n    !e.includes('schema')\n  );\n\n  // Récupérer les données originales depuis le pairedItem\n  const original = $('Limite - 50 plombiers').all()[index]?.json || {};\n\n  return {\n    json: {\n      nom: original.nom || '',\n      telephone: original.telephone || '',\n      adresse: original.adresse || '',\n      website: original.website || '',\n      email: filtered[0] || '',\n      source: 'Google Places'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-608, 1248],
+      "id": "f9f68faf-c3c2-4891-9d56-5295509bc481",
+      "name": "Code JS - Extrait emails HTML"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "61a427cd-1946-4cac-a245-64cab0eda1ec",
+              "leftValue": "={{ $json.website }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-608, 800],
+      "id": "aeee5a9b-7b2a-420c-9e6b-fb87457a7507",
+      "name": "Si - A un site web ?"
+    },
+    {
+      "parameters": {
+        "maxItems": 50
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [1408, 288],
+      "id": "3f06240d-1715-4753-ba9e-08bab0a6c7b9",
+      "name": "Limite - 50 plombiers"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "stage": "appointmentscheduled",
+        "additionalFields": {
+          "associatedCompany": "={{ $json.companyId }}",
+          "dealName": "={{ $json.nom_societe }}"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [2528, 288],
+      "id": "25e0e660-bc0a-4978-8eba-28422430546f",
+      "name": "HubSpot - Crée deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "company",
+        "name": "={{ $json.nom_societe }}",
+        "additionalFields": {
+          "leadStatus": "NEW",
+          "originalSourceType": "OFFLINE",
+          "phoneNumber": "={{ $json.telephone }}",
+          "streetAddress": "={{ $json.adresse }}",
+          "websiteUrl": "={{ $json.site_web }}"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [2304, 288],
+      "id": "0e2e0e3d-fe76-45eb-98f8-385daca5c6ec",
+      "name": "HubSpot - Crée company",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "stage": "appointmentscheduled",
+        "additionalFields": {
+          "associatedCompany": "={{ $json.companyId }}",
+          "dealName": "={{ $('Code JS - Dédoublonne résultats').item.json.nom }}"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [-608, -32],
+      "id": "e4f51b6c-d732-4297-a1e8-bcedf00ee732",
+      "name": "HubSpot - Crée deal v1",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "company",
+        "name": "={{ $('Code JS - Dédoublonne résultats').item.json.nom }}",
+        "additionalFields": {
+          "leadStatus": "NEW",
+          "originalSourceType": "OFFLINE",
+          "phoneNumber": "={{ $('Code JS - Dédoublonne résultats').item.json.telephone }}",
+          "streetAddress": "={{ $('Code JS - Dédoublonne résultats').item.json.adresse }}",
+          "websiteUrl": "={{ $('Code JS - Dédoublonne résultats').item.json.website }}"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [-608, -256],
+      "id": "02217bd8-5c6f-46d3-8b78-525a95b2cda8",
+      "name": "HubSpot - Crée company v1",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-608, 1472],
+      "id": "04d00b96-d667-4236-96aa-b31d5a9e9c45",
+      "name": "Boucle - Enrichissement"
+    },
+    {
+      "parameters": {
+        "url": "https://geo.api.gouv.fr/departements/59/communes?fields=nom,population&format=json&geometry=none",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [64, 384],
+      "id": "924f484e-e4db-4ef5-ae41-41bdd620d663",
+      "name": "API GeoGouv - Communes dep.59"
+    },
+    {
+      "parameters": {
+        "url": "https://geo.api.gouv.fr/departements/62/communes?fields=nom,population&format=json&geometry=none",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [64, 192],
+      "id": "3e5e6b40-fbc5-46a9-a4d2-ccd276be6efe",
+      "name": "API GeoGouv - Communes dep.62",
+      "executeOnce": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [288, 288],
+      "id": "a379f1db-eb26-4f02-a9c1-9206a5be5283",
+      "name": "Merge - Communes 59+62"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst now = new Date();\nconst currentMonth = now.toISOString().slice(0, 7);\n\nif (!staticData.quota || staticData.quota.month !== currentMonth) {\n  staticData.quota = {\n    month: currentMonth,\n    textsearch_count: 0,\n    estimated_cost_usd: 0.0,\n    limite_mensuelle_usd: 160,\n    alerte_80_envoyee: false,\n    alerte_100_envoyee: false\n  };\n}\n\nconst q = staticData.quota;\nconst pct = q.limite_mensuelle_usd > 0\n  ? (q.estimated_cost_usd / q.limite_mensuelle_usd * 100)\n  : 0;\nconst budget_ok = q.estimated_cost_usd < q.limite_mensuelle_usd;\nconst alerte_80  = !q.alerte_80_envoyee  && pct >= 80;\nconst alerte_100 = !q.alerte_100_envoyee && !budget_ok;\n\nif (alerte_80)  q.alerte_80_envoyee  = true;\nif (alerte_100) q.alerte_100_envoyee = true;\n\nconst msg = alerte_100\n  ? `\\u{1F6A8} Google Maps : limite atteinte (${pct.toFixed(0)}%) — workflow suspendu\\nConsommé : $${q.estimated_cost_usd.toFixed(2)} / $${q.limite_mensuelle_usd}`\n  : alerte_80\n  ? `⚠️ Google Maps : ${pct.toFixed(0)}% du budget mensuel atteint\\nConsommé : $${q.estimated_cost_usd.toFixed(2)} / $${q.limite_mensuelle_usd}`\n  : '';\n\nreturn [{json: {\n  budget_ok, alerte_80, alerte_100,\n  pct: +pct.toFixed(1),\n  quota_usd: +q.estimated_cost_usd.toFixed(3),\n  limite_usd: q.limite_mensuelle_usd,\n  mois: currentMonth,\n  message: msg\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-384, 384],
+      "id": "2e04cc9c-4d11-4f53-9731-84b8cc4d09a5",
+      "name": "Code JS - Vérifie quota Maps"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "1dea4fd0-0956-4f9e-b41b-709c408f97f2",
+              "leftValue": "={{ $json.budget_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-160, 384],
+      "id": "e07f1932-5d03-4be0-b7f4-f78bae812b50",
+      "name": "Si - Budget Maps OK ?"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [64, 576],
+      "id": "0a108b14-8117-4b6f-9dbb-df6d1db6eb7c",
+      "name": "Telegram - Alerte quota Maps",
+      "webhookId": "2017b41a-d576-4499-b704-bcd667275a80",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst items = $input.all();\nif (staticData.quota) {\n  const n = items.length;\n  staticData.quota.textsearch_count  = (staticData.quota.textsearch_count  || 0) + n;\n  staticData.quota.estimated_cost_usd = (staticData.quota.estimated_cost_usd || 0) + n * 0.032;\n}\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [736, 288],
+      "id": "fe33fe41-d102-481f-8f62-0d486d188c71",
+      "name": "Code JS - Màj quota Maps"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.phones_enrichis) staticData.phones_enrichis = [];\nconst existing = new Set(staticData.phones_enrichis.map(p => p.replace(/\\s/g, '')));\nreturn $input.all().filter(item => {\n  const phone = (item.json.telephone || '').replace(/\\s/g, '');\n  return phone && !existing.has(phone);\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1632, 288],
+      "id": "c42fa03d-74fb-4c03-b081-6b5f382325cf",
+      "name": "Code JS - Filtre nouveaux entries"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst TAVILY_KEY = 'YOUR_TAVILY_API_KEY';\nif (!staticData.phones_enrichis) staticData.phones_enrichis = [];\n\n// Generic fetch wrapper compatible with n8n Code node sandbox (Node 18+)\nasync function httpGet(url) {\n  const resp = await fetch(url, {\n    headers: {'User-Agent': 'Mozilla/5.0 (compatible)', 'Accept': 'application/json'},\n    signal: AbortSignal.timeout(8000)\n  });\n  const text = await resp.text();\n  try { return JSON.parse(text); } catch { return text; }\n}\nasync function httpPost(url, body, headers = {}) {\n  const resp = await fetch(url, {\n    method: 'POST',\n    headers: {'Content-Type': 'application/json', ...headers},\n    body: JSON.stringify(body),\n    signal: AbortSignal.timeout(8000)\n  });\n  const text = await resp.text();\n  try { return JSON.parse(text); } catch { return text; }\n}\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const d = item.json;\n  let email = d.email || '';\n  const erreurs = [];\n\n  // 1. Scrape site web pour email\n  if (d.website && !email) {\n    try {\n      const resp = await fetch(d.website, {\n        headers: {'User-Agent': 'Mozilla/5.0 (compatible)'},\n        signal: AbortSignal.timeout(5000)\n      });\n      const html = await resp.text();\n      const re = /[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}/g;\n      const emails = (html.match(re) || []).filter(e =>\n        !e.match(/sentry|example|@2x|wixpress|schema|\\.png|\\.jpg/i));\n      email = emails[0] || '';\n    } catch(e) { erreurs.push('site:' + e.message.slice(0, 40)); }\n  }\n\n  // 2. Data Gouv — SIRET + dirigeant\n  let siren='', siret='', dirigeant_prenom='', dirigeant_nom='';\n  let forme_juridique='', date_creation='', statut='A';\n  try {\n    const q = encodeURIComponent(d.nom || '');\n    const dg = await httpGet(\n      'https://recherche-entreprises.api.gouv.fr/search?q=' + q + '&departement=59,62&per_page=3'\n    );\n    const ents = (dg.results || []);\n    if (ents.length > 0) {\n      const e = ents[0];\n      siren  = e.siren || '';\n      siret  = (e.siege || {}).siret || '';\n      statut = e.etat_administratif || 'A';\n      forme_juridique = e.nature_juridique || '';\n      date_creation   = e.date_creation || '';\n      const dirs = e.dirigeants || [];\n      if (dirs.length > 0) {\n        dirigeant_prenom = dirs[0].prenoms || '';\n        dirigeant_nom    = dirs[0].nom || '';\n      }\n    }\n  } catch(e) { erreurs.push('dg:' + e.message.slice(0, 40)); }\n\n  // Ignorer entreprises cessées\n  if (statut && statut !== 'A') continue;\n\n  // Rate limiting Data Gouv\n  await new Promise(r => setTimeout(r, 500));\n\n  // 3. Tavily — LinkedIn URL\n  let linkedin_url = '';\n  try {\n    const tvData = await httpPost('https://api.tavily.com/search', {\n      query: 'site:linkedin.com/company \"' + (d.nom || '') + '\" plombier',\n      max_results: 3,\n      api_key: TAVILY_KEY\n    });\n    for (const r of (tvData.results || [])) {\n      if ((r.url || '').includes('linkedin.com/company/')) {\n        linkedin_url = r.url; break;\n      }\n    }\n  } catch(e) { erreurs.push('lk:' + e.message.slice(0, 40)); }\n\n  // Parser ville et CP depuis adresse\n  const adresse = d.adresse || '';\n  const cpM  = adresse.match(/\\b(?:59|62)\\d{3}\\b/);\n  const cp   = cpM ? cpM[0] : '';\n  const parts = adresse.replace(/,?\\s*France\\s*$/, '').split(',');\n  const ville = parts.length >= 2 ? parts[parts.length - 2].trim() : '';\n\n  // Mettre à jour le cache des téléphones\n  const phone = (d.telephone || '').replace(/\\s/g, '');\n  if (phone && !staticData.phones_enrichis.includes(phone)) {\n    staticData.phones_enrichis.push(phone);\n  }\n\n  results.push({json: {\n    nom_societe:  d.nom || '',\n    adresse, ville, cp,\n    telephone:    d.telephone || '',\n    email,\n    site_web:     d.website || '',\n    siren, siret,\n    dirigeant_prenom, dirigeant_nom,\n    forme_juridique, date_creation,\n    statut_entreprise: statut || 'A',\n    linkedin_url,\n    source:            'Google Places',\n    date_ajout:        new Date().toISOString().slice(0, 10),\n    enrichi:           erreurs.length === 0 ? 'oui' : 'partiel',\n    hubspot_synced:    'non',\n    enrichissement_erreur: erreurs.join('; ')\n  }});\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1856, 288],
+      "id": "3532da5b-0e55-42af-8c72-d041491e5941",
+      "name": "Code JS - Enrichit plombiers"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Plombiers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nom_societe": "={{ $json.nom_societe }}",
+            "adresse": "={{ $json.adresse }}",
+            "ville": "={{ $json.ville }}",
+            "cp": "={{ $json.cp }}",
+            "telephone": "={{ $json.telephone }}",
+            "email": "={{ $json.email }}",
+            "site_web": "={{ $json.site_web }}",
+            "siren": "={{ $json.siren }}",
+            "siret": "={{ $json.siret }}",
+            "dirigeant_prenom": "={{ $json.dirigeant_prenom }}",
+            "dirigeant_nom": "={{ $json.dirigeant_nom }}",
+            "forme_juridique": "={{ $json.forme_juridique }}",
+            "date_creation": "={{ $json.date_creation }}",
+            "statut_entreprise": "={{ $json.statut_entreprise }}",
+            "linkedin_url": "={{ $json.linkedin_url }}",
+            "source": "={{ $json.source }}",
+            "date_ajout": "={{ $json.date_ajout }}",
+            "enrichi": "={{ $json.enrichi }}",
+            "hubspot_synced": "={{ $json.hubspot_synced }}",
+            "enrichissement_erreur": "={{ $json.enrichissement_erreur }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "nom_societe", "displayName": "nom_societe", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "adresse", "displayName": "adresse", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "ville", "displayName": "ville", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "cp", "displayName": "cp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "telephone", "displayName": "telephone", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "site_web", "displayName": "site_web", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "siren", "displayName": "siren", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "siret", "displayName": "siret", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "dirigeant_prenom", "displayName": "dirigeant_prenom", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "dirigeant_nom", "displayName": "dirigeant_nom", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "forme_juridique", "displayName": "forme_juridique", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "date_creation", "displayName": "date_creation", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "statut_entreprise", "displayName": "statut_entreprise", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "linkedin_url", "displayName": "linkedin_url", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "source", "displayName": "source", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "date_ajout", "displayName": "date_ajout", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "enrichi", "displayName": "enrichi", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "hubspot_synced", "displayName": "hubspot_synced", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "enrichissement_erreur", "displayName": "enrichissement_erreur", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2080, 288],
+      "id": "4edb8764-968b-4a52-82ce-b621f95f0daf",
+      "name": "Sheets - Enregistre plombiers",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Scraping plombiers": {"main": [[{"node": "Code JS - Vérifie quota Maps", "type": "main", "index": 0}]]},
+    "Code JS - Vérifie quota Maps": {"main": [[{"node": "Si - Budget Maps OK ?", "type": "main", "index": 0}]]},
+    "Si - Budget Maps OK ?": {"main": [[{"node": "API GeoGouv - Communes dep.62", "type": "main", "index": 0}, {"node": "API GeoGouv - Communes dep.59", "type": "main", "index": 0}], [{"node": "Telegram - Alerte quota Maps", "type": "main", "index": 0}]]},
+    "API GeoGouv - Communes dep.62": {"main": [[{"node": "Merge - Communes 59+62", "type": "main", "index": 0}]]},
+    "API GeoGouv - Communes dep.59": {"main": [[{"node": "Merge - Communes 59+62", "type": "main", "index": 1}]]},
+    "Merge - Communes 59+62": {"main": [[{"node": "Code JS - Formate requêtes villes", "type": "main", "index": 0}]]},
+    "Code JS - Formate requêtes villes": {"main": [[{"node": "Code JS - Màj quota Maps", "type": "main", "index": 0}]]},
+    "Code JS - Màj quota Maps": {"main": [[{"node": "API Google - Places textsearch", "type": "main", "index": 0}]]},
+    "API Google - Places textsearch": {"main": [[{"node": "Code JS - Dédoublonne résultats", "type": "main", "index": 0}]]},
+    "Code JS - Dédoublonne résultats": {"main": [[{"node": "Limite - 50 plombiers", "type": "main", "index": 0}]]},
+    "Limite - 50 plombiers": {"main": [[{"node": "Code JS - Filtre nouveaux entries", "type": "main", "index": 0}, {"node": "Boucle - Enrichissement", "type": "main", "index": 0}]]},
+    "Code JS - Filtre nouveaux entries": {"main": [[{"node": "Code JS - Enrichit plombiers", "type": "main", "index": 0}]]},
+    "Code JS - Enrichit plombiers": {"main": [[{"node": "Sheets - Enregistre plombiers", "type": "main", "index": 0}]]},
+    "Sheets - Enregistre plombiers": {"main": [[{"node": "HubSpot - Crée company", "type": "main", "index": 0}]]},
+    "HubSpot - Crée company": {"main": [[{"node": "HubSpot - Crée deal", "type": "main", "index": 0}]]},
+    "Boucle - Enrichissement": {"main": [[{"node": "Si - A un site web ?", "type": "main", "index": 0}]]},
+    "Si - A un site web ?": {"main": [[{"node": "API HTTP - Scrape site web", "type": "main", "index": 0}]]},
+    "API HTTP - Scrape site web": {"main": [[{"node": "Code JS - Extrait emails HTML", "type": "main", "index": 0}]]},
+    "Code JS - Extrait emails HTML": {"main": [[{"node": "HubSpot - Crée company v1", "type": "main", "index": 0}]]},
+    "HubSpot - Crée company v1": {"main": [[{"node": "HubSpot - Crée deal v1", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

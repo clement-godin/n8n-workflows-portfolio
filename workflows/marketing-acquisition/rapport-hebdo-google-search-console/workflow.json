@@ -1,0 +1,132 @@
+{
+  "name": "Rapport hebdo Google Search Console",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://searchconsole.googleapis.com/webmasters/v3/sites/sc-domain%3Aemafuites.fr/searchAnalytics/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"startDate\": \"{{ $now.minus({days: 7}).toFormat('yyyy-MM-dd') }}\",\n  \"endDate\":   \"{{ $now.minus({days: 1}).toFormat('yyyy-MM-dd') }}\",\n  \"dimensions\": [\"query\", \"page\"],\n  \"rowLimit\": 25,\n  \"orderBy\": [{ \"fieldName\": \"clicks\", \"sortOrder\": \"DESCENDING\" }]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [208, 0],
+      "id": "a01aa193-d251-4b8f-be92-b64e599f2801",
+      "name": "HTTP Request - Semaine courante",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "TliXgPxpJQmgqDP0",
+          "name": "Google Search Console API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://searchconsole.googleapis.com/webmasters/v3/sites/sc-domain%3Aemafuites.fr/searchAnalytics/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n    \"startDate\": \"{{ $now.minus({days: 14}).toFormat('yyyy-MM-dd') }}\",\n    \"endDate\":   \"{{ $now.minus({days: 8}).toFormat('yyyy-MM-dd') }}\",\n  \"dimensions\": [\"query\", \"page\"],\n  \"rowLimit\": 25,\n  \"orderBy\": [{ \"fieldName\": \"clicks\", \"sortOrder\": \"DESCENDING\" }]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [448, 0],
+      "id": "5e3db634-3253-4f4b-912e-9075dbd43c2a",
+      "name": "HTTP Request - Semaine précédente",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "TliXgPxpJQmgqDP0",
+          "name": "Google Search Console API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const current = $('HTTP Request - Semaine courante').first().json.rows || [];\nconst previous = $('HTTP Request - Semaine précédente').first().json.rows || [];\n\n// Crée un map semaine précédente par query\nconst prevMap = {};\nfor (const row of previous) {\n  prevMap[row.keys[0]] = row;\n}\n\n// Calcule les variations\nconst enriched = current.map(row => {\n  const query = row.keys[0];\n  const page  = row.keys[1];\n  const prev  = prevMap[query];\n\n  const deltaClics    = prev ? row.clicks - prev.clicks : null;\n  const deltaPosition = prev ? prev.position - row.position : null; // positif = amélioration\n\n  return {\n    query,\n    page,\n    clics:         row.clicks,\n    impressions:   row.impressions,\n    ctr:           (row.ctr * 100).toFixed(1) + '%',\n    position:      row.position.toFixed(1),\n    deltaClics,\n    deltaPosition: deltaPosition ? deltaPosition.toFixed(1) : 'nouveau',\n    tendance:      deltaPosition > 0 ? '📈' : deltaPosition < 0 ? '📉' : '➡️'\n  };\n});\n\n// Top 5 progressions / régressions\nconst progressions = [...enriched]\n  .filter(r => r.deltaPosition !== 'nouveau')\n  .sort((a, b) => b.deltaPosition - a.deltaPosition)\n  .slice(0, 5);\n\nconst regressions = [...enriched]\n  .filter(r => r.deltaPosition !== 'nouveau')\n  .sort((a, b) => a.deltaPosition - b.deltaPosition)\n  .slice(0, 5);\n\n// Totaux globaux\nconst totalClics       = enriched.reduce((s, r) => s + r.clics, 0);\nconst totalImpressions = enriched.reduce((s, r) => s + r.impressions, 0);\nconst totalClicsPrev   = previous.reduce((s, r) => s + r.clicks, 0);\nconst deltaTotal       = totalClics - totalClicsPrev;\n\nreturn [{\n  json: {\n    semaine:    $today.minus({days: 7}).toFormat('dd/MM') + ' → ' + $today.minus({days: 1}).toFormat('dd/MM/yyyy'),\n    totalClics,\n    totalImpressions,\n    deltaTotal,\n    top25:      enriched,\n    progressions,\n    regressions\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [624, 0],
+      "id": "8eb00651-9fc5-482b-8561-b43e081be11e",
+      "name": "Code JS - Calcule variations SEO"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nconst fleche = d.deltaTotal >= 0 ? '▲' : '▼';\nconst signe  = d.deltaTotal >= 0 ? '+' : '';\n\nlet lignesTop = d.top25.slice(0, 10).map(r =>\n  `${r.tendance} <b>${r.query}</b>\\n` +\n  `   ${r.clics} clics · pos. ${r.position} · CTR ${r.ctr}`\n).join('\\n\\n');\n\nlet lignesHausse = d.progressions.map(r =>\n  `📈 <b>${r.query}</b> : +${r.deltaPosition} pos. (→ ${r.position})`\n).join('\\n');\n\nlet lignesBaisse = d.regressions.map(r =>\n  `📉 <b>${r.query}</b> : ${r.deltaPosition} pos. (→ ${r.position})`\n).join('\\n');\n\nconst message = \n`📊 <b>Rapport SEO — ${d.semaine}</b>\n\n<b>Vue d'ensemble</b>\n🖱 Clics totaux : ${d.totalClics} (${fleche} ${signe}${d.deltaTotal} vs semaine préc.)\n👁 Impressions  : ${d.totalImpressions}\n\n<b>Top 10 requêtes</b>\n${lignesTop}\n\n<b>Meilleures progressions</b>\n${lignesHausse}\n\n<b>Points de vigilance</b>\n${lignesBaisse}`;\n\nreturn [{ json: { message } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [832, 0],
+      "id": "f8b9be0d-8e67-423a-acff-a3aa4c567d8c",
+      "name": "Code JS - Formate rapport SEO"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1040, 0],
+      "id": "e5677b2a-5fea-4f20-ac17-d9dfa8169fbe",
+      "name": "Telegram - Envoie rapport SEO",
+      "webhookId": "871e9e41-f455-4887-afae-93f430ae983a",
+      "credentials": {
+        "telegramApi": {
+          "id": "MxotDkEtya5DiMOd",
+          "name": "RAPPORT_SEO_HEBDOMADAIRE_BOT"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{}]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0],
+      "id": "921b2f6d-574d-43e8-ac54-9657e002e965",
+      "name": "Trigger - Rapport Search Console hebdo"
+    }
+  ],
+  "connections": {
+    "HTTP Request - Semaine courante": {
+      "main": [[{ "node": "HTTP Request - Semaine précédente", "type": "main", "index": 0 }]]
+    },
+    "HTTP Request - Semaine précédente": {
+      "main": [[{ "node": "Code JS - Calcule variations SEO", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Calcule variations SEO": {
+      "main": [[{ "node": "Code JS - Formate rapport SEO", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Formate rapport SEO": {
+      "main": [[{ "node": "Telegram - Envoie rapport SEO", "type": "main", "index": 0 }]]
+    },
+    "Trigger - Rapport Search Console hebdo": {
+      "main": [[{ "node": "HTTP Request - Semaine courante", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["MARKETING", "RAPPORT SEO & SEA"]
+}

@@ -1,0 +1,269 @@
+{
+  "name": "VERIF RE CAPTCHA GOOGLE LANDING RENO MSHDF",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mshdf-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f9d84f6c-5686-4989-a548-ed6ff313b65a",
+      "name": "Webhook - Réception Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1200, -32],
+      "webhookId": "mshdf-lead-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// VÉRIFICATION RECAPTCHA CÔTÉ SERVEUR\n// ============================================================\n\nconst { recaptchaToken } = $input.first().json.body;\n\nif (!recaptchaToken) {\n    return [{ json: { valid: false, reason: 'Token manquant' } }];\n}\n\nreturn [{\n    json: {\n        ...$input.first().json.body,\n        assessmentBody: {\n            event: {\n                token: recaptchaToken,\n                siteKey: 'YOUR_RECAPTCHA_SITE_KEY',\n                expectedAction: 'SUBMIT_QUOTE'\n            }\n        }\n    }\n}];"
+      },
+      "id": "873e23bf-2d0c-4964-a8dd-4b9e36111059",
+      "name": "Code JS - Vérifie reCAPTCHA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-976, -32]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Webhook - Réception Lead').first().json.body;\n\nconst typeLabels = {\n    'Complete':   'Rénovation complète',\n    'Partielle':  'Rénovation partielle',\n    'SDB':        'Salle de bain',\n    'ElecPlomb':  'Électricité / Plomberie',\n    'Sol':        'Pose de sol',\n    'Dressing':   'Dressing',\n    'Autre':      'Autre'\n};\n\nconst budgetLabels = {\n    '5-10k':  '5 000 – 10 000 €',\n    '10-20k': '10 000 – 20 000 €',\n    '20-50k': '20 000 – 50 000 €',\n    '50k+':   'Plus de 50 000 €',\n    'nsp':    'Je ne sais pas encore'\n};\n\nconst budgetMap = {\n    '5-10k':  7500,\n    '10-20k': 15000,\n    '20-50k': 35000,\n    '50k+':   75000,\n    'nsp':    0\n};\n\nconst amount = budgetMap[d.budget] || 0;\nconst typeLabel = typeLabels[d.type] || d.type || 'Non précisé';\nconst budgetLabel = budgetLabels[d.budget] || d.budget || 'Non précisé';\nconst description = d.description || 'Aucune description fournie';\nconst telephone = d.telephone || 'Non renseigné';\nconst email = d.email || 'Non renseigné';\n\nconst htmlBody = `\n<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background: #ea580c; padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"color: white; margin: 0;\">🔔 Nouveau Lead MSHDF</h2>\n    <p style=\"color: rgba(255,255,255,0.8); margin: 5px 0 0 0;\">Reçu le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>\n  </div>\n  <div style=\"background: #f8f9fa; padding: 24px; border: 1px solid #e9ecef;\">\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057; width: 40%;\">👤 Nom</td>\n        <td style=\"padding: 12px 0; color: #212529;\">${d.nom || 'Non renseigné'}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">📧 Email</td>\n        <td style=\"padding: 12px 0;\"><a href=\"mailto:${email}\" style=\"color: #ea580c;\">${email}</a></td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">📞 Téléphone</td>\n        <td style=\"padding: 12px 0;\"><a href=\"tel:${telephone}\" style=\"color: #ea580c;\">${telephone}</a></td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">🔨 Type de projet</td>\n        <td style=\"padding: 12px 0;\">${typeLabel}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">💰 Budget estimé</td>\n        <td style=\"padding: 12px 0;\">${budgetLabel}</td>\n      </tr>\n    </table>\n    <div style=\"margin-top: 20px;\">\n      <p style=\"font-weight: bold; color: #495057; margin-bottom: 8px;\">📝 Description du projet :</p>\n      <div style=\"background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 16px; color: #212529; line-height: 1.6;\">${description.replace(/\\n/g, '<br>')}</div>\n    </div>\n  </div>\n  <div style=\"background: #343a40; padding: 16px; border-radius: 0 0 8px 8px; text-align: center;\">\n    <p style=\"color: rgba(255,255,255,0.6); margin: 0; font-size: 12px;\">Lead généré depuis renovation.emarenovation59.fr • reCAPTCHA score: ${d.recaptchaScore || 'N/A'}</p>\n  </div>\n</div>`;\n\nreturn [{\n    json: {\n        ...d,\n        amount,\n        emailSubject: `🔔 Nouveau lead MSHDF - ${typeLabel} - ${d.nom || 'Inconnu'}`,\n        emailHtml: htmlBody,\n        emailText: `Nouveau lead MSHDF\\nNom: ${d.nom}\\nEmail: ${email}\\nTél: ${telephone}\\nProjet: ${typeLabel}\\nBudget: ${budgetLabel}\\nDescription: ${description}`\n    }\n}];"
+      },
+      "id": "efe6da95-da08-4eb0-986e-e54987ebfc9a",
+      "name": "Code JS - Formate email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [144, -128]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LISTE LEAD LANDING RENOVATION",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nom": "={{ $('Webhook - Réception Lead').item.json.body.nom }}",
+            "email": "={{ $('Webhook - Réception Lead').item.json.body.email }}",
+            "telephone": "={{ $('Webhook - Réception Lead').item.json.body.telephone }}",
+            "type": "={{ $('Webhook - Réception Lead').item.json.body.type }}",
+            "budget": "={{ {'5-10k':'5000-10000','10-20k':'10000-20000','20-50k':'20000-50000','50k+': +50000,'nsp':0}[$('Webhook - Réception Lead').first().json.body.budget] }}",
+            "description": "={{ $('Webhook - Réception Lead').item.json.body.description }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "nom", "displayName": "nom", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "telephone", "displayName": "telephone", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "type", "displayName": "type", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "budget", "displayName": "budget", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "description", "displayName": "description", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "16c3bff1-8b3d-49a0-b87a-dbc7e98116dd",
+      "name": "Sheets - Enregistre lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [1040, -128],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"message\": \"Lead reçu avec succès\" }",
+        "options": { "responseCode": 200 }
+      },
+      "id": "1fad2d71-9f27-4b57-8841-c213105660ae",
+      "name": "Webhook - Réponse succès",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-80, -128]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": false, \"message\": \"Validation échouée\" }",
+        "options": { "responseCode": 400 }
+      },
+      "id": "fa8d743b-887d-4f00-abac-de64a3f2a73e",
+      "name": "Webhook - Réponse erreur",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-80, 64]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 3, "leftValue": "", "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "f56785ca-df92-4ba1-a81d-a48cbcad6e83",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-304, -32],
+      "id": "efb2c279-ea7a-4313-8aab-6345fe8e4cff",
+      "name": "Si - Score valide ?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://recaptchaenterprise.googleapis.com/v1/projects/re-captcha-landing/assessments",
+        "sendQuery": false,
+        "queryParameters": { "parameters": [] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.assessmentBody) }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-752, -32],
+      "id": "f063af14-58cb-4b7e-b7f2-a0d8ae2237ae",
+      "name": "API Google - Vérifie reCAPTCHA",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "Z2MD1rs1NKZGsR0m",
+          "name": "Google reCAPTCHA Key - MSHDF"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\nconst score = data.riskAnalysis?.score ?? 0;\nconst tokenValid = data.tokenProperties?.valid === true;\nconst invalidReason = data.tokenProperties?.invalidReason || '';\n\nif (!tokenValid) {\n    return [{ json: { valid: false, score, reason: invalidReason } }];\n}\n\nif (score < 0.5) {\n    return [{ json: { valid: false, score, reason: 'Score trop bas' } }];\n}\n\nreturn [{ json: { ...$input.first().json, valid: true, score } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-528, -32],
+      "id": "b4b78739-b280-4ca2-8ccf-fb2d5ba58a17",
+      "name": "Code JS - Évalue score"
+    },
+    {
+      "parameters": {
+        "sendTo": "your-email@domain.com",
+        "subject": "={{ $json.emailSubject }}",
+        "message": "={{ $json.emailHtml }}",
+        "options": { "appendAttribution": false, "replyTo": "={{ $json.email }}" }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [368, -128],
+      "id": "8202c2b4-1841-438b-a86d-b85d14bb85a6",
+      "name": "Gmail - Envoie notif lead",
+      "webhookId": "315c85ce-5a94-410b-ac31-3e0b3d65cf7c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5KWmGq134q2eiYyC",
+          "name": "COMPTE GMAIL EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "stage": "appointmentscheduled",
+        "additionalFields": {
+          "amount": "={{ {'5-10k':'7500','10-20k':'15000','20-50k':'37500','50k+':+50000,'nsp':0}[$('Webhook - Réception Lead').first().json.body.budget] }}",
+          "associatedVids": "={{ $json.vid }}",
+          "description": "={{ $('Code JS - Vérifie reCAPTCHA').item.json.description }}",
+          "dealName": "={{ $('Code JS - Vérifie reCAPTCHA').item.json.nom }} - {{ $('Code JS - Vérifie reCAPTCHA').item.json.type }}"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [816, -128],
+      "id": "5286a0cc-e6ba-4d8d-b30f-f07c6b32d2af",
+      "name": "HubSpot - Crée deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "email": "={{ $('Code JS - Vérifie reCAPTCHA').item.json.email }}",
+        "additionalFields": {
+          "firstName": "={{ $('Webhook - Réception Lead').first().json.body.nom.split(' ')[0] }}",
+          "lastName": "={{ $('Webhook - Réception Lead').first().json.body.nom.split(' ').slice(1).join(' ') }}",
+          "phoneNumber": "={{ $('Code JS - Vérifie reCAPTCHA').item.json.telephone }}"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [592, -128],
+      "id": "b9efba45-c33a-40d0-b2a9-58045379b377",
+      "name": "HubSpot - Upsert contact",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Réception Lead": { "main": [[{ "node": "Code JS - Vérifie reCAPTCHA", "type": "main", "index": 0 }]] },
+    "Code JS - Vérifie reCAPTCHA": { "main": [[{ "node": "API Google - Vérifie reCAPTCHA", "type": "main", "index": 0 }]] },
+    "Code JS - Formate email": { "main": [[{ "node": "Gmail - Envoie notif lead", "type": "main", "index": 0 }]] },
+    "Sheets - Enregistre lead": { "main": [[]] },
+    "Si - Score valide ?": {
+      "main": [
+        [{ "node": "Webhook - Réponse succès", "type": "main", "index": 0 }],
+        [{ "node": "Webhook - Réponse erreur", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook - Réponse erreur": { "main": [[]] },
+    "API Google - Vérifie reCAPTCHA": { "main": [[{ "node": "Code JS - Évalue score", "type": "main", "index": 0 }]] },
+    "Code JS - Évalue score": { "main": [[{ "node": "Si - Score valide ?", "type": "main", "index": 0 }]] },
+    "Gmail - Envoie notif lead": { "main": [[{ "node": "HubSpot - Upsert contact", "type": "main", "index": 0 }]] },
+    "HubSpot - Crée deal": { "main": [[{ "node": "Sheets - Enregistre lead", "type": "main", "index": 0 }]] },
+    "HubSpot - Upsert contact": { "main": [[{ "node": "HubSpot - Crée deal", "type": "main", "index": 0 }]] },
+    "Webhook - Réponse succès": { "main": [[{ "node": "Code JS - Formate email", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

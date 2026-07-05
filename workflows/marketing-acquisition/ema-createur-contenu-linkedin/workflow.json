@@ -1,0 +1,92 @@
+{
+  "name": "EMA - CRÉATEUR CONTENU LINKEDIN",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ema-linkedin",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "9013c9b7-a648-4e58-92ac-49b5f41e0c50",
+      "name": "Webhook - LinkedIn",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [256, 304],
+      "webhookId": "6b36f661-f769-4623-aa32-afc297bf5127",
+      "credentials": {
+        "httpHeaderAuth": { "id": "G5SBA0FXpVZKTBj6", "name": "n8n Internal Webhook Secret" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst prompt = `Tu es ghostwriter LinkedIn pour EMAFUITES, spécialiste détection de fuites non destructive en Hauts-de-France.\n\nRédige un post LinkedIn selon ces specs. Réponds UNIQUEMENT en JSON valide sans backticks.\n\nSujet : ${body.sujet || ''}\nAngle éditorial : ${body.angle || ''}\nNotes brutes : ${body.notes || ''}\nPilier : ${body.pilier || 'éducation'}\n\nVOICE PROMPT EMAFUITES :\n- Ton : expert local, direct, concret — jamais donneur de leçons\n- Zone : toujours ancrer dans le Nord/Hauts-de-France si possible\n- Résultats chiffrés si disponibles (délais d'intervention, économies réalisées)\n- Parler des vrais problèmes : plancher chauffant, canalisation enterrée, humidité mur, fuite sous carrelage\n\nSTRUCTURE OBLIGATOIRE :\n1. Accroche : 1 ligne max, chiffre ou situation concrète, pas de question\n2. Développement : 3 à 5 points courts (pas de bullets, utiliser retours à la ligne)\n3. CTA : 1 phrase simple, pas de \"n'hésitez pas\"\n\nINTERDITS ABSOLUS :\n- 'Dans un monde où'\n- 'La clé c'est'\n- 'Et vous, qu'en pensez-vous ?'\n- Emojis fusée, feu, étoile\n- Listes à puces avec tirets ou bullets\n- Hashtags en fin de post (max 2 si vraiment nécessaire)\n\nLongueur : 150 à 250 mots\n\nRéponds : {\"post\": \"texte complet du post\", \"accroche_alternatives\": [\"alternative 1\", \"alternative 2\"]}`;\n\nreturn [{json: {\n  ...body,\n  claudeBody: {model: \"claude-sonnet-4-6\", max_tokens: 1000, messages: [{role: \"user\", content: prompt}]}\n}}];"
+      },
+      "id": "3029ee57-949c-4624-b010-a16e8a2e825a",
+      "name": "Code - Préparer Post LinkedIn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [464, 304]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "anthropic-version", "value": "2023-06-01" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.claudeBody) }}",
+        "options": {}
+      },
+      "id": "8ea49fcc-9344-4da4-a915-4ce16f14a7bb",
+      "name": "Claude - Générer Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [656, 304],
+      "credentials": { "anthropicApi": { "id": "8Wcb8jgMTJM6CQjM", "name": "Anthropic account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nlet parsed;\ntry { parsed = JSON.parse(resp.content[0].text); }\ncatch(e) { parsed = {post: 'Erreur génération', accroche_alternatives: ['','']}}\nreturn [{json: {post: parsed.post, accroches: parsed.accroche_alternatives || []}}];"
+      },
+      "id": "221f0e78-cb17-415a-b0ce-29205cf4489c",
+      "name": "Code - Parser Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [864, 304]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=✍️ *Nouveau post LinkedIn à valider*\n\n{{ $json.post }}\n\n---\n💡 *Accroches alternatives :*\n1. {{ $json.accroches[0] || 'N/A' }}\n2. {{ $json.accroches[1] || 'N/A' }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "f975f0e0-74e4-4bee-85f6-40243106855a",
+      "name": "Telegram - Post à Valider",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1056, 304],
+      "webhookId": "58b5747d-537d-45a4-a819-bc4cd175a58b",
+      "credentials": { "telegramApi": { "id": "RaG5QR5En7OmVEPM", "name": "scoring_lead_auto_bot" } }
+    }
+  ],
+  "connections": {
+    "Webhook - LinkedIn": { "main": [[{ "node": "Code - Préparer Post LinkedIn", "type": "main", "index": 0 }]] },
+    "Code - Préparer Post LinkedIn": { "main": [[{ "node": "Claude - Générer Post", "type": "main", "index": 0 }]] },
+    "Claude - Générer Post": { "main": [[{ "node": "Code - Parser Post", "type": "main", "index": 0 }]] },
+    "Code - Parser Post": { "main": [[{ "node": "Telegram - Post à Valider", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  }
+}

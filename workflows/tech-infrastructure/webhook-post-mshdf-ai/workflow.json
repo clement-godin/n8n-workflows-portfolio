@@ -1,0 +1,252 @@
+{
+  "name": "Webhook POST /mshdf-ai",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mshdf-ai",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        48
+      ],
+      "id": "036db8fa-a3dd-4df9-bc03-f48e3179054a",
+      "name": "Webhook - Requête IA MSHDF",
+      "webhookId": "91079e68-6b49-4c1d-bb93-82115fc40fb5",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.claudeBody) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        -48
+      ],
+      "id": "40e26784-85a4-4926-b8ac-8cb4ae582d80",
+      "name": "API Anthropic - Génère réponse",
+      "credentials": {
+        "anthropicApi": {
+          "id": "RZVOt3bK3EJAJe4E",
+          "name": "CLE API LANDING RENO ANTHROPIC"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ text: $json.text }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1328,
+        -48
+      ],
+      "id": "67aefc58-4fb4-459a-baae-a9445fc14ded",
+      "name": "Webhook - Répond résultat IA"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { userPrompt, systemPrompt } = $input.first().json.body;\n\nconst cleanPrompt = (str) => (str || '')\n    .replace(/[\\r\\n\\t]/g, ' ')\n    .replace(/\"/g, \"'\")\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst antiMarkdown = \" IMPORTANT : Reponds en texte brut uniquement. Aucun markdown. Pas de **, pas de *, pas de #. Uniquement du texte et des tirets simples si necessaire.\";\n\nreturn [{\n    json: {\n        claudeBody: {\n            model: 'claude-haiku-4-5-20251001',\n            max_tokens: 300,\n            system: cleanPrompt(systemPrompt) + antiMarkdown,\n            messages: [{\n                role: 'user',\n                content: cleanPrompt(userPrompt)\n            }]\n        }\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -48
+      ],
+      "id": "269474cf-12aa-4539-9cec-504de54b28fa",
+      "name": "Code JS - Prépare prompt Claude"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ip = ($input.first().json.headers?.['x-forwarded-for']?.split(',')[0] || 'unknown')\n    .trim()\n    .replace(/\\./g, '_');\n\nconst now = Date.now();\nconst key = `ai_${ip}`;\nconst last = $execution.customData.get(key) || 0;\n\nif (now - last < 4000) {\n    return [{ json: { blocked: true, text: '' } }];\n}\n\n$execution.customData.set(key, now);\nreturn [{ json: { ...$input.first().json, blocked: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        48
+      ],
+      "id": "43022f05-5cad-4f78-b30b-54863c90865c",
+      "name": "Code JS - Rate limit IP"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "98d6a11c-ea98-45a2-98f9-be16dd98e237",
+              "leftValue": "={{ $json.blocked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        48
+      ],
+      "id": "2709a383-d213-4278-bb5c-b8ebb7c07c82",
+      "name": "Si - Non bloqué ?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"text\": \"\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        144
+      ],
+      "id": "88c6b8f7-5f0d-46d2-9728-76ef283c291e",
+      "name": "Webhook - Répond bloqué"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.first().json.content?.[0]?.text || '';\n\n// Nettoyage markdown\nconst clean = text\n    .replace(/\\*\\*(.*?)\\*\\*/g, '$1')   // **gras** → gras\n    .replace(/\\*(.*?)\\*/g, '$1')        // *italique* → italique\n    .replace(/#{1,6}\\s/g, '')           // # titres\n    .replace(/^[-•]\\s/gm, '- ')         // normaliser les puces\n    .trim();\n\nreturn [{ json: { text: clean } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        -48
+      ],
+      "id": "6651e851-1848-414a-89c0-600e23d1ea51",
+      "name": "Code JS - Nettoie markdown"
+    }
+  ],
+  "connections": {
+    "Webhook - Requête IA MSHDF": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Rate limit IP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Anthropic - Génère réponse": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Nettoie markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Prépare prompt Claude": {
+      "main": [
+        [
+          {
+            "node": "API Anthropic - Génère réponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Rate limit IP": {
+      "main": [
+        [
+          {
+            "node": "Si - Non bloqué ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Non bloqué ?": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Prépare prompt Claude",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook - Répond bloqué",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Nettoie markdown": {
+      "main": [
+        [
+          {
+            "node": "Webhook - Répond résultat IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,514 @@
+{
+  "name": "récup devis evolyz",
+  "active": false,
+  "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 1
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          672
+        ],
+        "id": "c2f9340f-c922-475d-a731-9b22c8d0741e",
+        "name": "Trigger - Récup devis Evolyz"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://www.evoliz.io/api/login",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "public_key",
+                "value": "YOUR_EVOLIZ_PUBLIC_KEY"
+              },
+              {
+                "name": "secret_key",
+                "value": "YOUR_EVOLIZ_SECRET_KEY"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          224,
+          672
+        ],
+        "id": "882d3417-0673-48e4-b4a5-1e07cfdc9081",
+        "name": "API Evolyz - Auth"
+      },
+      {
+        "parameters": {
+          "url": "https://www.evoliz.io/api/v1/quotes",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{$json.access_token}}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          448,
+          672
+        ],
+        "id": "41925b75-037f-4349-b97b-0b311883480a",
+        "name": "API Evolyz - Récupère devis"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT statut FROM devis WHERE evoliz_id = '{{$json.quoteid}}'",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1104,
+          720
+        ],
+        "id": "665e48ec-9e27-491d-9f0d-eb654251c621",
+        "name": "SQL - Vérifie statut devis",
+        "alwaysOutputData": true,
+        "credentials": {
+          "postgres": {
+            "id": "9r90D1udv0rR4VEu",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "fieldToSplitOut": "data",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitOut",
+        "typeVersion": 1,
+        "position": [
+          672,
+          672
+        ],
+        "id": "710803b4-e425-40c4-aa06-66c146e2f188",
+        "name": "Prépare - Éclate devis"
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.statut }}",
+                      "rightValue": "={{ $('Loop Over Items').item.json.status }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "notEquals"
+                      },
+                      "id": "1d9897cd-5dea-4375-b0a1-8b4702b871be"
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "statut changé"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict",
+                    "version": 2
+                  },
+                  "conditions": [
+                    {
+                      "id": "e4db7950-906e-48ad-b64d-f4850d1692fd",
+                      "leftValue": "={{ $json.statut }}",
+                      "rightValue": "={{ $('Loop Over Items').item.json.status }}",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "name": "filter.operator.equals"
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": true,
+                "outputKey": "aucun changement"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.3,
+        "position": [
+          1360,
+          768
+        ],
+        "id": "9492f029-673b-4cd1-a958-90f5814a58bc",
+        "name": "Switch - Devis existant ?"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          896,
+          672
+        ],
+        "id": "2dd9973a-a84c-4a33-b6c8-4c3800a4e040",
+        "name": "Loop Over Items"
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          1632,
+          896
+        ],
+        "id": "b07cf505-ad3c-4bcb-9a15-02f130fc65c5",
+        "name": "Prépare - Aucun changement"
+      },
+      {
+        "parameters": {
+          "operation": "upsert",
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": {
+            "__rl": true,
+            "value": "devis",
+            "mode": "list",
+            "cachedResultName": "devis"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "client_id": "={{ $('Loop Over Items').item.json.client.clientid }}",
+              "montant_ht": "={{ $('Loop Over Items').item.json.total.vat_exclude }}",
+              "montant_ttc": "={{ $('Loop Over Items').item.json.total.vat_include }}",
+              "statut": "={{ $('Loop Over Items').item.json.status }}",
+              "numero_devis": "={{ $('Loop Over Items').item.json.document_number }}",
+              "id": "={{ $('Loop Over Items').item.json.quoteid }}",
+              "date_creation": "={{ $('Loop Over Items').item.json.status_dates.create }}",
+              "date_acceptation": "={{ $('Loop Over Items').item.json.status_dates.accept }}",
+              "date_envoi": "={{ $('Loop Over Items').item.json.status_dates.sent }}",
+              "date_refus": "={{ $('Loop Over Items').item.json.status_dates.reject }}",
+              "date_facturation": "={{ $('Loop Over Items').item.json.status_dates.invoice }}",
+              "date_mise_en_attente": "={{ $('Loop Over Items').item.json.status_dates.wait }}",
+              "date_cloture": "={{ $('Loop Over Items').item.json.status_dates.close }}",
+              "evoliz_id": "={{ $('Loop Over Items').item.json.quoteid }}"
+            },
+            "matchingColumns": [
+              "evoliz_id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "numero_devis",
+                "displayName": "numero_devis",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "client_id",
+                "displayName": "client_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "intervention_id",
+                "displayName": "intervention_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": false,
+                "removed": true
+              },
+              {
+                "id": "montant_ht",
+                "displayName": "montant_ht",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "statut",
+                "displayName": "statut",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "date_creation",
+                "displayName": "date_creation",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "evoliz_id",
+                "displayName": "evoliz_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "montant_ttc",
+                "displayName": "montant_ttc",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "date_acceptation",
+                "displayName": "date_acceptation",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "date_envoi",
+                "displayName": "date_envoi",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "date_refus",
+                "displayName": "date_refus",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "date_facturation",
+                "displayName": "date_facturation",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "date_mise_en_attente",
+                "displayName": "date_mise_en_attente",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": false
+              },
+              {
+                "id": "date_cloture",
+                "displayName": "date_cloture",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          1536,
+          448
+        ],
+        "id": "9ec1b104-98d0-4d2b-b060-6060e7d34f34",
+        "name": "SQL - Upsert devis",
+        "credentials": {
+          "postgres": {
+            "id": "9r90D1udv0rR4VEu",
+            "name": "Postgres account"
+          }
+        }
+      }
+  ],
+  "connections": {
+      "Trigger - Récup devis Evolyz": {
+        "main": [
+          [
+            {
+              "node": "API Evolyz - Auth",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "API Evolyz - Auth": {
+        "main": [
+          [
+            {
+              "node": "API Evolyz - Récupère devis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "API Evolyz - Récupère devis": {
+        "main": [
+          [
+            {
+              "node": "Prépare - Éclate devis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SQL - Vérifie statut devis": {
+        "main": [
+          [
+            {
+              "node": "Switch - Devis existant ?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prépare - Éclate devis": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch - Devis existant ?": {
+        "main": [
+          [
+            {
+              "node": "SQL - Upsert devis",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Prépare - Aucun changement",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Over Items": {
+        "main": [
+          [],
+          [
+            {
+              "node": "SQL - Vérifie statut devis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prépare - Aucun changement": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "SQL - Upsert devis": {
+        "main": [
+          [
+            {
+              "node": "Loop Over Items",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+  },
+  "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false
+  }
+}

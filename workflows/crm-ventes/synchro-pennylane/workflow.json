@@ -1,0 +1,121 @@
+{
+  "name": "synchro pennylane",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "b7f3496f-7164-4ad0-ba2d-267e6f32b9f1",
+      "name": "Trigger - Synchro Pennylane"
+    },
+    {
+      "parameters": {
+        "url": "https://app.pennylane.com/api/external/v2/customers?sort=-id",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [256, 0],
+      "id": "c2cc3fbd-11a5-4ae3-9499-2cf6cafba5f2",
+      "name": "API Pennylane - Récupère factures",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rwtcPRFK6wZgmAus",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [464, 0],
+      "id": "7d6f55d1-bdbe-408a-889b-6e4bb039abf1",
+      "name": "Prépare - Éclate clients"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "clients",
+          "mode": "list",
+          "cachedResultName": "clients"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "type_client": "={{ $json.items.customer_type }}",
+            "nom_client": "={{ $json.items.name }}",
+            "adresse": "={{ $json.items.billing_address.address }}",
+            "code_postal": "={{ $json.items.billing_address.postal_code }}",
+            "ville": "={{ $json.items.billing_address.city }}",
+            "date_creation": "={{ $json.items.created_at }}",
+            "telephone": "={{ $json.items.phone }}",
+            "id_externe": "={{ $json.items.id }}"
+          },
+          "matchingColumns": ["id_externe"],
+          "schema": [
+            { "id": "id", "displayName": "id", "required": false, "defaultMatch": true, "display": true, "type": "number", "canBeUsedToMatch": true, "removed": false },
+            { "id": "id_externe", "displayName": "id_externe", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "nom_client", "displayName": "nom_client", "required": true, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false },
+            { "id": "type_client", "displayName": "type_client", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false },
+            { "id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false },
+            { "id": "telephone", "displayName": "telephone", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false },
+            { "id": "adresse", "displayName": "adresse", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false },
+            { "id": "code_postal", "displayName": "code_postal", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false },
+            { "id": "ville", "displayName": "ville", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false },
+            { "id": "date_creation", "displayName": "date_creation", "required": false, "defaultMatch": false, "display": true, "type": "dateTime", "canBeUsedToMatch": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [672, 0],
+      "id": "fb90ca96-4134-4ffb-a28b-e30fbb660944",
+      "name": "SQL - Upsert clients",
+      "credentials": {
+        "postgres": {
+          "id": "9r90D1udv0rR4VEu",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Synchro Pennylane": {
+      "main": [[{ "node": "API Pennylane - Récupère factures", "type": "main", "index": 0 }]]
+    },
+    "API Pennylane - Récupère factures": {
+      "main": [[{ "node": "Prépare - Éclate clients", "type": "main", "index": 0 }]]
+    },
+    "Prépare - Éclate clients": {
+      "main": [[{ "node": "SQL - Upsert clients", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["META BASE", "CRM & VENTES"]
+}

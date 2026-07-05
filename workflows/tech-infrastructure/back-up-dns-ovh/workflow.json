@@ -1,0 +1,243 @@
+{
+  "name": "BACK UP DNS OVH",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "triggerAtHour": 1 }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, -384],
+      "id": "e28bdd80-c5ed-417f-8715-b2bf5aab22a9",
+      "name": "Trigger - Backup DNS OVH"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On interroge le premier noeud nommé \"Config API\" pour récupérer les clés\nconst config = $('Config API').first().json;\n\nconst AK = config.AK;\nconst AS = config.AS;\nconst CK = config.CK;\n\n\nconst method = 'GET';\nconst url = 'https://eu.api.ovh.com/1.0/domain/zone/';\nconst body = '';\n\n// 2. Extraction du timestamp OVH\nlet ovhTime = 0;\nif (typeof $json === 'number') ovhTime = $json;\nelse if (typeof $json === 'string') ovhTime = parseInt($json, 10);\nelse if ($json && $json.data) ovhTime = parseInt($json.data, 10);\nelse {\n    const rawValue = JSON.stringify($json).replace(/\\D/g, ''); \n    ovhTime = parseInt(rawValue, 10);\n}\nconst timestamp = Math.floor(ovhTime);\n\n// 3. Chaîne exacte à signer\nconst toSign = `${AS}+${CK}+${method}+${url}+${body}+${timestamp}`;\n\n// 4. Fonction algorithme SHA-1 (100% Pure JavaScript)\nfunction sha1(s) {\n    var chrsz = 8;\n    var hexcase = 0;\n    function hex_sha1(s) { return binb2hex(core_sha1(str2binb(s), s.length * chrsz)); }\n    function core_sha1(x, len) {\n        x[len >> 5] |= 0x80 << (24 - len % 32);\n        x[((len + 64 >> 9) << 4) + 15] = len;\n        var w = Array(80), a = 1732584193, b = -271733879, c = -1732584194, d = 271733878, e = -1009589776;\n        for (var i = 0; i < x.length; i += 16) {\n            var olda = a, oldb = b, oldc = c, oldd = d, olde = e;\n            for (var j = 0; j < 80; j++) {\n                if (j < 16) w[j] = x[i + j];\n                else w[j] = rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);\n                var t = safe_add(safe_add(rol(a, 5), sha1_ft(j, b, c, d)), safe_add(safe_add(e, w[j]), sha1_kt(j)));\n                e = d; d = c; c = rol(b, 30); b = a; a = t;\n            }\n            a = safe_add(a, olda); b = safe_add(b, oldb); c = safe_add(c, oldc); d = safe_add(d, oldd); e = safe_add(e, olde);\n        }\n        return Array(a, b, c, d, e);\n    }\n    function sha1_ft(t, b, c, d) {\n        if (t < 20) return (b & c) | ((~b) & d);\n        if (t < 40) return b ^ c ^ d;\n        if (t < 60) return (b & c) | (b & d) | (c & d);\n        return b ^ c ^ d;\n    }\n    function sha1_kt(t) {\n        return (t < 20) ? 1518500249 : (t < 40) ? 1859775393 : (t < 60) ? -1894007588 : -899497514;\n    }\n    function safe_add(x, y) {\n        var lsw = (x & 0xFFFF) + (y & 0xFFFF);\n        var msw = (x >> 16) + (y >> 16) + (lsw >> 16);\n        return (msw << 16) | (lsw & 0xFFFF);\n    }\n    function rol(num, cnt) {\n        return (num << cnt) | (num >>> (32 - cnt));\n    }\n    function str2binb(str) {\n        var bin = Array();\n        var mask = (1 << chrsz) - 1;\n        for (var i = 0; i < str.length * chrsz; i += chrsz)\n            bin[i >> 5] |= (str.charCodeAt(i / chrsz) & mask) << (24 - i % 32);\n        return bin;\n    }\n    function binb2hex(binarray) {\n        var hex_tab = hexcase ? \"0123456789ABCDEF\" : \"0123456789abcdef\";\n        var str = \"\";\n        for (var i = 0; i < binarray.length * 4; i++) {\n            str += hex_tab.charAt((binarray[i >> 2] >> ((3 - i % 4) * 8 + 4)) & 0xF) +\n                   hex_tab.charAt((binarray[i >> 2] >> ((3 - i % 4) * 8)) & 0xF);\n        }\n        return str;\n    }\n    return hex_sha1(s);\n}\n\n// 5. Création de la signature au format attendu par OVH\nconst signature = `$1$${sha1(toSign)}`;\n\nreturn [{\n  json: {\n    url: url,\n    AK: AK,\n    CK: CK,\n    timestamp: timestamp,\n    signature: signature\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [896, -384],
+      "id": "e41e80a2-e9d6-41d4-ae74-d3d55b1a14f4",
+      "name": "Code JS - Signe req zones"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Ovh-Application", "value": "={{ $json.AK }}" },
+            { "name": "X-Ovh-Consumer", "value": "={{ $json.CK }}" },
+            { "name": "X-Ovh-Signature", "value": "={{ $json.signature }}" },
+            { "name": "X-Ovh-Timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1120, -384],
+      "id": "41aab50f-82cb-4c0d-b087-fc5e7941afb9",
+      "name": "API OVH - Liste zones"
+    },
+    {
+      "parameters": {
+        "url": "https://eu.api.ovh.com/1.0/auth/time",
+        "options": {
+          "response": { "response": { "responseFormat": "text" } }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [672, -384],
+      "id": "5b155fbc-226d-4068-b35a-75436c68c7a9",
+      "name": "Get OVH Time"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On interroge le premier noeud nommé \"Config API\" pour récupérer les clés\nconst config = $('Config API').first().json;\n\nconst AK = config.AK;\nconst AS = config.AS;\nconst CK = config.CK;\n\nconst method = 'GET';\n\n// 2. Extraction de la liste des domaines\nlet domains = [];\nfor (const item of $input.all()) {\n    if (!item || !item.json) continue;\n    const data = item.json;\n    if (Array.isArray(data)) domains.push(...data);\n    else if (typeof data === 'object') domains.push(...Object.values(data));\n    else if (typeof data === 'string') domains.push(data);\n}\n\ndomains = domains.filter(d => typeof d === 'string' && d.includes('.'));\nif (domains.length === 0) throw new Error(\"Aucun domaine n'a été trouvé.\");\n\nconst results = [];\n\n// 3. Fonction algorithme SHA-1\nfunction sha1(s) {\n    var chrsz = 8; var hexcase = 0;\n    function hex_sha1(s) { return binb2hex(core_sha1(str2binb(s), s.length * chrsz)); }\n    function core_sha1(x, len) {\n        x[len >> 5] |= 0x80 << (24 - len % 32); x[((len + 64 >> 9) << 4) + 15] = len;\n        var w = Array(80), a = 1732584193, b = -271733879, c = -1732584194, d = 271733878, e = -1009589776;\n        for (var i = 0; i < x.length; i += 16) {\n            var olda = a, oldb = b, oldc = c, oldd = d, olde = e;\n            for (var j = 0; j < 80; j++) {\n                if (j < 16) w[j] = x[i + j]; else w[j] = rol(w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16], 1);\n                var t = safe_add(safe_add(rol(a, 5), sha1_ft(j, b, c, d)), safe_add(safe_add(e, w[j]), sha1_kt(j)));\n                e = d; d = c; c = rol(b, 30); b = a; a = t;\n            }\n            a = safe_add(a, olda); b = safe_add(b, oldb); c = safe_add(c, oldc); d = safe_add(d, oldd); e = safe_add(e, olde);\n        }\n        return Array(a, b, c, d, e);\n    }\n    function sha1_ft(t, b, c, d) { if (t < 20) return (b & c) | ((~b) & d); if (t < 40) return b ^ c ^ d; if (t < 60) return (b & c) | (b & d) | (c & d); return b ^ c ^ d; }\n    function sha1_kt(t) { return (t < 20) ? 1518500249 : (t < 40) ? 1859775393 : (t < 60) ? -1894007588 : -899497514; }\n    function safe_add(x, y) { var lsw = (x & 0xFFFF) + (y & 0xFFFF); var msw = (x >> 16) + (y >> 16) + (lsw >> 16); return (msw << 16) | (lsw & 0xFFFF); }\n    function rol(num, cnt) { return (num << cnt) | (num >>> (32 - cnt)); }\n    function str2binb(str) { var bin = Array(); var mask = (1 << chrsz) - 1; for (var i = 0; i < str.length * chrsz; i += chrsz) bin[i >> 5] |= (str.charCodeAt(i / chrsz) & mask) << (24 - i % 32); return bin; }\n    function binb2hex(binarray) { var hex_tab = hexcase ? \"0123456789ABCDEF\" : \"0123456789abcdef\"; var str = \"\"; for (var i = 0; i < binarray.length * 4; i++) { str += hex_tab.charAt((binarray[i >> 2] >> ((3 - i % 4) * 8 + 4)) & 0xF) + hex_tab.charAt((binarray[i >> 2] >> ((3 - i % 4) * 8)) & 0xF); } return str; }\n    return hex_sha1(s);\n}\n\n// 4. La Boucle : On interroge l'API OVH EN DIRECT pour chaque domaine\nfor (const domain of domains) {\n    \n    // Requête HTTP intégrée pour obtenir l'heure exacte à l'instant T\n    const timeResponse = await this.helpers.httpRequest({\n        method: 'GET',\n        url: 'https://eu.api.ovh.com/1.0/auth/time',\n    });\n    \n    // On extrait le timestamp de la réponse\n    const timestamp = Math.floor(parseInt(timeResponse, 10));\n    \n    const url = `https://eu.api.ovh.com/1.0/domain/zone/${domain}/export`;\n    const toSign = `${AS}+${CK}+${method}+${url}++${timestamp}`;\n    const signature = `$1$${sha1(toSign)}`;\n    \n    results.push({\n        json: {\n            domain: domain,\n            url: url,\n            AK: AK,\n            CK: CK,\n            timestamp: timestamp, \n            signature: signature\n        }\n    });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1344, -384],
+      "id": "bb5a5ed3-81c9-4442-b5b1-e84d7e17b62f",
+      "name": "Code JS - Signe req export"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Ovh-Application", "value": "={{ $json.AK }}" },
+            { "name": "X-Ovh-Consumer", "value": "={{ $json.CK }}" },
+            { "name": "X-Ovh-Signature", "value": "={{ $json.signature }}" },
+            { "name": "X-Ovh-Timestamp", "value": "={{ $json.timestamp }}" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1568, -384],
+      "id": "37eab4fd-6307-43fe-af82-f31098fcc80c",
+      "name": "API OVH - Export zone"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "=data",
+        "name": "=DNS_Backup_{{ $('Code JS - Signe req export').item.json.domain }}_{{ $now.format('yyyy-MM-dd') }}.txt",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Create folder').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1792, -384],
+      "id": "b8106893-e34a-4bd6-8a8c-8a6ac7bd0c6e",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{$now.format('yyyy-MM-dd')}}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+          "mode": "list",
+          "cachedResultName": "BACK UP DNS OVH",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_DRIVE_FOLDER_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [224, -384],
+      "id": "cfe16bfc-ce5c-4919-aacb-e800562635be",
+      "name": "Create folder",
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "7d12ffa1-c4ad-4b91-aa69-362550d59b92", "name": "AK", "value": "YOUR_OVH_APPLICATION_KEY", "type": "string" },
+            { "id": "3ee7ef64-df65-4b63-a257-bbae1c302404", "name": "AS", "value": "YOUR_OVH_APPLICATION_SECRET", "type": "string" },
+            { "id": "851e4c6f-315d-4bd1-bcff-97c8befd7141", "name": "CK", "value": "YOUR_OVH_CONSUMER_KEY", "type": "string" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [448, -384],
+      "id": "58b00969-145d-433c-9252-32876ce92fba",
+      "name": "Config API"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+            "mode": "list",
+            "cachedResultName": "BACK UP DNS OVH",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_DRIVE_FOLDER_ID"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2000, -384],
+      "id": "ca3027db-1382-4297-b8fe-aef4a26b8e83",
+      "name": "Search files and folders",
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. On recule de 30 jours par rapport à la date du jour\nconst limitDate = new Date();\nlimitDate.setDate(limitDate.getDate() - 30);\n\nconst filesToDelete = [];\n\n// 2. On parcourt vos 3 items\nfor (const item of $input.all()) {\n    const folderName = item.json.name;\n    \n    // Sécurité : On vérifie que le nom est bien au format Date (YYYY-MM-DD)\n    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(folderName)) {\n        \n        const folderDate = new Date(folderName);\n        \n        // Si le dossier est PLUS VIEUX que notre limite de 30 jours...\n        if (folderDate < limitDate) {\n            // ... on l'ajoute à la liste des condamnés\n            filesToDelete.push(item);\n        }\n    }\n}\n\n// 3. On transmet le résultat au noeud Delete\nreturn filesToDelete;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2208, -384],
+      "id": "2c4fe008-f819-45d7-8cb8-fd32546450f0",
+      "name": "Code JS - Filtre dossiers anciens"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "operation": "deleteFolder",
+        "folderNoRootId": { "__rl": true, "value": "={{ $json.id }}", "mode": "id" },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2416, -384],
+      "id": "d248c792-7046-41d4-8e8e-324833556601",
+      "name": "Delete folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Backup DNS OVH": { "main": [[{ "node": "Create folder", "type": "main", "index": 0 }]] },
+    "Code JS - Signe req zones": { "main": [[{ "node": "API OVH - Liste zones", "type": "main", "index": 0 }]] },
+    "Get OVH Time": { "main": [[{ "node": "Code JS - Signe req zones", "type": "main", "index": 0 }]] },
+    "API OVH - Liste zones": { "main": [[{ "node": "Code JS - Signe req export", "type": "main", "index": 0 }]] },
+    "Code JS - Signe req export": { "main": [[{ "node": "API OVH - Export zone", "type": "main", "index": 0 }]] },
+    "API OVH - Export zone": { "main": [[{ "node": "Upload file", "type": "main", "index": 0 }]] },
+    "Create folder": { "main": [[{ "node": "Config API", "type": "main", "index": 0 }]] },
+    "Config API": { "main": [[{ "node": "Get OVH Time", "type": "main", "index": 0 }]] },
+    "Upload file": { "main": [[{ "node": "Search files and folders", "type": "main", "index": 0 }]] },
+    "Search files and folders": { "main": [[{ "node": "Code JS - Filtre dossiers anciens", "type": "main", "index": 0 }]] },
+    "Code JS - Filtre dossiers anciens": { "main": [[{ "node": "Delete folder", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

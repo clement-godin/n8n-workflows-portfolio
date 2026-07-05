@@ -1,0 +1,57 @@
+{
+  "name": "🚨 Alerte Erreurs Globales",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "f01bfcfa-7df7-4387-905f-d820b1540153",
+      "name": "Trigger - Erreurs globales"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🚨 *ERREUR CRITIQUE SUR n8n* 🚨\n\n📄 *Workflow :* {{$json.workflow.name}}\n🛑 *Nœud fautif :* {{$json.execution.lastNodeExecuted}}\n\n❌ *Message d'erreur :* {{$json.execution.error.message}}\n\n🔗 [Clique ici pour voir l'exécution dans n8n]({{$json.execution.url}})",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [208, 0],
+      "id": "db9cb9e0-4e88-48f4-b387-658ac4882e6c",
+      "name": "Telegram - Alerte erreur critique",
+      "webhookId": "37985df2-c152-4cc8-8441-07a249338730",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Erreurs globales": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Alerte erreur critique",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  },
+  "tags": ["TECH & INFRA", "GESTIONS ERREURS"]
+}

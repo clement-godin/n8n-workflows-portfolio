@@ -1,0 +1,255 @@
+{
+  "name": "VERIF RE CAPTCHA GOOGLE LANDING EMA FUITES",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "emafuites-leads",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "fdcd8ccc-481a-4b8c-87f8-b8df46013ad9",
+      "name": "Webhook - Réception Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [192, 272],
+      "webhookId": "1089c7fc-d584-46c8-9de0-97e243154a82"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst recaptchaToken = body.recaptchaToken;\n\nif (!recaptchaToken) {\n  return [{ json: { valid: false, reason: 'Token manquant', ...body } }];\n}\n\nreturn [{\n  json: {\n    ...body,\n    assessmentBody: {\n      event: {\n        token: recaptchaToken,\n        siteKey: '6LcvqPIsAAAAAJsyRhXcCz-Bv-rEStpn4oZlQ0SZ',\n        expectedAction: 'SUBMIT_DEVIS'\n      }\n    }\n  }\n}];"
+      },
+      "id": "24b0c3ad-e4ac-4a77-9ba6-9fd3f0feb958",
+      "name": "Code JS - Vérifie reCAPTCHA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [416, 272]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://recaptchaenterprise.googleapis.com/v1/projects/re-captcha-landing/assessments",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.assessmentBody) }}\n",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth"
+      },
+      "id": "f43dff99-519e-4fb4-a156-17032026d894",
+      "name": "API Google - Vérifie reCAPTCHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [640, 272],
+      "credentials": {
+        "httpQueryAuth": { "id": "uFkmUfBN3HCknMo8", "name": "Google reCAPTCHA Key - EMA Fuites" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst score = response.riskAnalysis?.score || 0;\nconst tokenValid = response.tokenProperties?.valid === true;\nconst valid = score >= 0.5 && tokenValid;\n\nconst leadData = $('Code JS - Vérifie reCAPTCHA').first().json;\n\nreturn [{\n    json: {\n        ...leadData,\n        recaptchaScore: score,\n        valid: valid\n    }\n}];"
+      },
+      "id": "3868814b-ad13-4e03-8e94-db06ae169fe5",
+      "name": "Code JS - Évalue score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [864, 272]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 3, "leftValue": "", "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "f56785ca-df92-4ba1-a81d-a48cbcad6e83",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1088, 272],
+      "id": "20b4f6cb-1be6-49e3-b6e1-85fe24cce6e8",
+      "name": "Si - Score valide ?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"message\": \"Lead reçu avec succès\" }",
+        "options": { "responseCode": 200 }
+      },
+      "id": "c002eeb8-25f7-4e06-a9ab-dba5367ba233",
+      "name": "Webhook - Réponse succès",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1312, 176]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": false, \"message\": \"Validation échouée\" }",
+        "options": { "responseCode": 400 }
+      },
+      "id": "36a5e99a-d94c-4106-a22a-155a18ed3b31",
+      "name": "Webhook - Réponse erreur",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1312, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Webhook - Réception Lead').first().json.body;\n\nconst sourcePage = d.source_page || 'Non renseigné';\nconst utmTerm = d.utm_term || 'Direct';\nconst utmSource = d.utm_source || 'Direct';\nconst utmCampaign = d.utm_campaign || 'Non renseigné';\nconst telephone = d.telephone || 'Non renseigné';\nconst ville = d.ville || 'Non renseigné';\nconst description = d.description || 'Aucune description fournie';\nconst score = $('Code JS - Évalue score').first().json.recaptchaScore || 0;\n\nconst pageLabels = {\n  '/fuite-sous-carrelage': '🔵 Fuite sous carrelage',\n  '/fuite-canalisation': '🔵 Fuite canalisation',\n  '/fuite-toiture-terrasse': '🔵 Fuite toiture terrasse',\n  '/fuite-plancher-chauffant': '🔵 Fuite plancher chauffant',\n  '/infiltration-humidite-mur': '🔵 Humidité / Infiltration mur',\n  '/recherche-fuite-non-destructive': '🔵 Recherche fuite générique'\n};\n\nconst pageLabel = pageLabels[sourcePage] || sourcePage;\n\nconst htmlBody = `\n<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background: linear-gradient(135deg, #071a2e, #00b894); padding: 20px; border-radius: 8px 8px 0 0;\">\n    <h2 style=\"color: white; margin: 0;\">🔔 Nouveau Lead EMA Fuites</h2>\n    <p style=\"color: rgba(255,255,255,0.8); margin: 5px 0 0 0;\">Reçu le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>\n  </div>\n  <div style=\"background: #f8f9fa; padding: 24px; border: 1px solid #e9ecef;\">\n    <table style=\"width: 100%; border-collapse: collapse;\">\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057; width: 40%;\">👤 Nom</td>\n        <td style=\"padding: 12px 0; color: #212529;\">${d.nom || 'Non renseigné'}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">📞 Téléphone</td>\n        <td style=\"padding: 12px 0;\"><a href=\"tel:${telephone}\" style=\"color: #00b894;\">${telephone}</a></td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">📍 Ville</td>\n        <td style=\"padding: 12px 0;\">${ville}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">📄 Page source</td>\n        <td style=\"padding: 12px 0;\">${pageLabel}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">🔍 Mot-clé Google</td>\n        <td style=\"padding: 12px 0;\">${utmTerm}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">📊 Campagne</td>\n        <td style=\"padding: 12px 0;\">${utmCampaign}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #dee2e6;\">\n        <td style=\"padding: 12px 0; font-weight: bold; color: #495057;\">🛡 Score reCAPTCHA</td>\n        <td style=\"padding: 12px 0; color: ${score >= 0.7 ? '#00b894' : score >= 0.5 ? '#f39c12' : '#e74c3c'}\">${score} / 1.0</td>\n      </tr>\n    </table>\n    <div style=\"margin-top: 20px;\">\n      <p style=\"font-weight: bold; color: #495057; margin-bottom: 8px;\">📝 Description du problème :</p>\n      <div style=\"background: white; border: 1px solid #dee2e6; border-radius: 6px; padding: 16px; color: #212529; line-height: 1.6;\">${description.replace(/\\n/g, '<br>')}</div>\n    </div>\n  </div>\n  <div style=\"background: #071a2e; padding: 16px; border-radius: 0 0 8px 8px; text-align: center;\">\n    <p style=\"color: rgba(255,255,255,0.6); margin: 0; font-size: 12px;\">Lead généré depuis ema-fuites.fr${sourcePage} • Source: ${utmSource}</p>\n  </div>\n</div>`;\n\nreturn [{\n    json: {\n        ...d,\n        recaptchaScore: score,\n        pageLabel,\n        emailSubject: `🔔 Nouveau lead EMA Fuites - ${pageLabel} - ${d.nom || 'Inconnu'}`,\n        emailHtml: htmlBody,\n        emailText: `Nouveau lead EMA Fuites\\nNom: ${d.nom}\\nTél: ${telephone}\\nVille: ${ville}\\nPage: ${sourcePage}\\nMot-clé: ${utmTerm}\\nDescription: ${description}`\n    }\n}];"
+      },
+      "id": "664bc88e-709c-4544-a3ec-f530eac4450b",
+      "name": "Code JS - Formate email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1536, 176]
+    },
+    {
+      "parameters": {
+        "sendTo": "=your-email@domain.com",
+        "subject": "={{ $json.emailSubject }}",
+        "message": "={{ $json.emailHtml }}",
+        "options": {}
+      },
+      "id": "cfd886c1-fa25-40fe-874c-03ef73c3ac4e",
+      "name": "Gmail - Envoie notif lead",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1760, 176],
+      "webhookId": "e31d3428-f5b9-4e89-a833-0c8b40300b74",
+      "credentials": {
+        "gmailOAuth2": { "id": "5KWmGq134q2eiYyC", "name": "COMPTE GMAIL EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "email": "={{ $('Code JS - Vérifie reCAPTCHA').item.json.email || '' }}",
+        "additionalFields": {
+          "firstName": "={{ $('Webhook - Réception Lead').first().json.body.nom.split(' ')[0] }}",
+          "lastName": "={{ $('Webhook - Réception Lead').first().json.body.nom.split(' ').slice(1).join(' ') }}",
+          "phoneNumber": "={{ $('Code JS - Vérifie reCAPTCHA').item.json.telephone }}"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [1984, 176],
+      "id": "7b65a646-576a-4ec6-af52-d8dc3a875aa3",
+      "name": "HubSpot - Upsert contact",
+      "credentials": {
+        "hubspotAppToken": { "id": "JnaOUFzIE4lA3O1R", "name": "HubSpot account EMA FUITES" }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "stage": "appointmentscheduled",
+        "additionalFields": {
+          "amount": 350,
+          "associatedVids": "={{ $json.vid }}",
+          "description": "={{ $('Code JS - Vérifie reCAPTCHA').item.json.description }} | Page: {{ $('Code JS - Vérifie reCAPTCHA').item.json.source_page }} | Mot-clé: {{ $('Code JS - Vérifie reCAPTCHA').item.json.utm_term }}",
+          "dealName": "={{ $('Code JS - Vérifie reCAPTCHA').item.json.nom }} - {{ $('Formater l\\'email').item.json.pageLabel }}"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [2208, 176],
+      "id": "6f1a12ad-bfdc-4cd2-b1bf-a460f3b5eb5c",
+      "name": "HubSpot - Crée deal",
+      "credentials": {
+        "hubspotAppToken": { "id": "JnaOUFzIE4lA3O1R", "name": "HubSpot account EMA FUITES" }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LISTE LEADS EMA FUITES",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": { "__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Feuille 1" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nom": "={{ $('Webhook - Réception Lead').item.json.body.nom }}",
+            "telephone": "={{ $('Webhook - Réception Lead').item.json.body.telephone }}",
+            "ville": "={{ $('Webhook - Réception Lead').item.json.body.ville }}",
+            "description": "={{ $('Webhook - Réception Lead').item.json.body.description }}",
+            "source_page": "={{ $('Webhook - Réception Lead').item.json.body.source_page }}",
+            "utm_source": "={{ $('Webhook - Réception Lead').item.json.body.utm_source }}",
+            "utm_medium": "={{ $('Webhook - Réception Lead').item.json.body.utm_medium }}",
+            "utm_campaign": "={{ $('Webhook - Réception Lead').item.json.body.utm_campaign }}",
+            "utm_term": "={{ $('Webhook - Réception Lead').item.json.body.utm_term }}",
+            "recaptcha_score": "={{ $('Code JS - Évalue score').item.json.recaptchaScore }}",
+            "date_reception": "={{ new Date().toLocaleString('fr-FR') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "nom", "displayName": "nom", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "telephone", "displayName": "telephone", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "ville", "displayName": "ville", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "description", "displayName": "description", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "source_page", "displayName": "source_page", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "utm_source", "displayName": "utm_source", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "utm_medium", "displayName": "utm_medium", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "utm_campaign", "displayName": "utm_campaign", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "utm_term", "displayName": "utm_term", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "recaptcha_score", "displayName": "recaptcha_score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "date_reception", "displayName": "date_reception", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f450ac16-2d09-459b-b625-b0b1c4765313",
+      "name": "Sheets - Enregistre lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [2432, 176],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      },
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Webhook - Réception Lead": { "main": [[{ "node": "Code JS - Vérifie reCAPTCHA", "type": "main", "index": 0 }]] },
+    "Code JS - Vérifie reCAPTCHA": { "main": [[{ "node": "API Google - Vérifie reCAPTCHA", "type": "main", "index": 0 }]] },
+    "API Google - Vérifie reCAPTCHA": { "main": [[{ "node": "Code JS - Évalue score", "type": "main", "index": 0 }]] },
+    "Code JS - Évalue score": { "main": [[{ "node": "Si - Score valide ?", "type": "main", "index": 0 }]] },
+    "Si - Score valide ?": {
+      "main": [
+        [{ "node": "Webhook - Réponse succès", "type": "main", "index": 0 }],
+        [{ "node": "Webhook - Réponse erreur", "type": "main", "index": 0 }]
+      ]
+    },
+    "Webhook - Réponse succès": { "main": [[{ "node": "Code JS - Formate email", "type": "main", "index": 0 }]] },
+    "Code JS - Formate email": { "main": [[{ "node": "Gmail - Envoie notif lead", "type": "main", "index": 0 }]] },
+    "Gmail - Envoie notif lead": { "main": [[{ "node": "HubSpot - Upsert contact", "type": "main", "index": 0 }]] },
+    "HubSpot - Upsert contact": { "main": [[{ "node": "HubSpot - Crée deal", "type": "main", "index": 0 }]] },
+    "HubSpot - Crée deal": { "main": [[{ "node": "Sheets - Enregistre lead", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

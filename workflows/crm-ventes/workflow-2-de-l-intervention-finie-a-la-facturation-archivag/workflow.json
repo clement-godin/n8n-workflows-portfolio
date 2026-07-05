@@ -1,0 +1,109 @@
+{
+  "name": "Workflow 2 _ De l_Intervention Finie à la Facturation_Archivage",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "8ae0320d-ec29-4121-b893-f781499c8891",
+      "name": "Webhook - Intervention finie",
+      "webhookId": "00000000-0000-0000-0000-000000000000",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "state",
+                    "rightValue": "done",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "071a7d77-9c5a-46dd-b6ba-61a36cbb3164",
+                    "leftValue": "state",
+                    "rightValue": "failed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [208, 0],
+      "id": "4cf905c4-b9c5-41b0-98e3-a398601cc17a",
+      "name": "Switch - Type action"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [416, -32],
+      "id": "b18e7e0f-b2a4-462a-a18f-2030be721289",
+      "name": "API HubSpot - Crée facture"
+    }
+  ],
+  "connections": {
+    "Webhook - Intervention finie": {
+      "main": [[{ "node": "Switch - Type action", "type": "main", "index": 0 }]]
+    },
+    "Switch - Type action": {
+      "main": [[{ "node": "API HubSpot - Crée facture", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["CRM & VENTES", "SYNCHRO TEAM"]
+}

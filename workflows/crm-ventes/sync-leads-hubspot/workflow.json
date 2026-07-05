@@ -1,0 +1,350 @@
+{
+  "name": "SYNC LEADS → HUBSPOT",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "7a7faf7b-d9d9-4e86-9af0-8226a27807b0",
+      "name": "Trigger - Sync leads 5min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [256, 160]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sync-leads-emafuites-form",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "7fb91710-919d-4cb2-afac-03d9a2e109a4",
+      "name": "Webhook - Formulaire site",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [704, 352],
+      "webhookId": "b5a12f59-260b-4944-b56e-b4a4196964ba"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "SHEETS_LEADS_ID_A_CONFIGURER",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "leads_whatsapp",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": []
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "id": "fc2068d3-b6dc-47b5-a6db-c81cd2c334e0",
+      "name": "Google Sheets - Lire leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [480, 160],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      },
+      "notes": "⚠️ Configurer: remplacer SHEETS_LEADS_ID_A_CONFIGURER par l'ID réel"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Filter only new rows since last execution using staticData\nconst staticData = $getWorkflowStaticData('global');\nconst rows = $input.all();\n\n// Track last processed timestamp\nconst lastProcessed = staticData.lastProcessedTimestamp || 0;\nconst now = Date.now();\n\n// Filter rows with timestamp newer than last processed\n// Google Sheets rows include a Date column\nconst newRows = [];\nfor (const row of rows) {\n  const dateStr = row.json['Date'] || row.json['Horodateur'] || '';\n  if (!dateStr) continue;\n  const rowTime = new Date(dateStr).getTime();\n  if (!isNaN(rowTime) && rowTime > lastProcessed) {\n    newRows.push(row);\n  }\n}\n\n// Update last processed to now\nstaticData.lastProcessedTimestamp = now;\n\nif (newRows.length === 0) return [];\nreturn newRows.map(r => ({ json: { ...r.json, source: 'Google Sheets' } }));\n"
+      },
+      "id": "cb451dc5-c842-4495-a89c-dbb773de1148",
+      "name": "Code JS - Filtre nouvelles lignes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [704, 160],
+      "notes": "Garde seulement les lignes nouvelles depuis la dernière exécution via staticData"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst item = $input.first().json;\n\nconst prenom = (item['Prénom'] || item['prenom'] || item['Nom'] || '').toString().trim();\nconst nom = (item['Nom de famille'] || item['nom'] || '').toString().trim();\nconst phone = (item['Téléphone'] || item['telephone'] || item['Tel'] || '').toString();\nconst email = (item['Email'] || item['email'] || '').toString().trim().toLowerCase();\nconst source = (item['source'] || 'Google Sheets').toString();\nconst message = (item['Message'] || item['message'] || item['Problème'] || '').toString().trim();\nconst ville = (item['Ville'] || item['ville'] || '').toString().trim();\nconst typeFuite = (item['Type de fuite'] || item['type_fuite'] || '').toString().trim();\n\nlet tel = phone.replace(/[\\s\\-\\.\\(\\)]/g, '');\nif (tel.startsWith('0')) tel = '33' + tel.slice(1);\nif (tel && !tel.startsWith('+')) tel = '+' + tel;\n\nconst nom_complet = `${prenom} ${nom}`.trim();\n\nreturn [{ json: {\n  prenom, nom, phone: tel, email, source, message, ville, typeFuite,\n  fullName: nom_complet || prenom\n}}];\n"
+      },
+      "id": "beaa1d03-5fb6-46a5-89e8-0a0138f43bd1",
+      "name": "Code JS - Normalise lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [928, 256]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"filterGroups\": [{\"filters\": [{\"propertyName\": \"phone\", \"operator\": \"EQ\", \"value\": \"{{ $json.phone }}\"}]}, {\"filters\": [{\"propertyName\": \"email\", \"operator\": \"EQ\", \"value\": \"{{ $json.email }}\"}]}], \"properties\": [\"firstname\", \"email\", \"phone\"], \"limit\": 1}",
+        "options": {}
+      },
+      "id": "6c7f7108-49f7-44b9-9aac-e7fb8c8709b3",
+      "name": "HubSpot - Rechercher contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1152, 256],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst lead = $('Code JS - Normalise lead').item.json;\nconst result = $input.first().json;\nconst existing = result.results || [];\n\nreturn [{ json: {\n  ...lead,\n  existingContactId: existing.length > 0 ? existing[0].id : null,\n  isNew: existing.length === 0\n}}];\n"
+      },
+      "id": "5f94e456-4bc6-44c6-89ad-df212c6232da",
+      "name": "Code JS - Contact existe ?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1376, 256]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isNew }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "condition-1781283911268-5id1bfioo"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a3edd023-6da8-4fd7-b688-a0cd9603ba4e",
+      "name": "Si - Nouveau ou existant ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1600, 256]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"firstname\": \"{{ $json.prenom }}\", \"lastname\": \"{{ $json.nom }}\", \"phone\": \"{{ $json.phone }}\", \"email\": \"{{ $json.email }}\", \"source_lead\": \"{{ $json.source }}\", \"canal_entrant\": \"{{ $json.source }}\", \"date_premier_contact\": \"{{ new Date().toISOString() }}\"}}",
+        "options": {}
+      },
+      "id": "0013e4d4-c4c7-49fd-937b-da702bf8b604",
+      "name": "HubSpot - Créer contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1824, 160],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.existingContactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"source_lead\": \"{{ $json.source }}\"}}",
+        "options": {}
+      },
+      "id": "52ff162c-cd5c-49de-a400-273d024975dc",
+      "name": "HubSpot - Màj contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1824, 352],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst lead = $('Code JS - Contact existe ?').item.json;\nconst resp = $input.first().json;\nconst contactId = resp.id || lead.existingContactId;\nconst dealName = `${lead.fullName} — ${lead.typeFuite || 'Détection fuite'} — ${lead.ville || 'Nord'}`;\nreturn [{ json: { ...lead, contactId, dealName } }];\n"
+      },
+      "id": "2dc89080-379b-40a9-9863-fbf0bfdce0d2",
+      "name": "Code JS - Prépare deal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2048, 256]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/deals",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"dealname\": \"{{ $json.dealName }}\", \"dealstage\": \"appointmentscheduled\", \"pipeline\": \"default\"}, \"associations\": [{\"to\": {\"id\": {{ $json.contactId }}}, \"types\": [{\"associationCategory\": \"HUBSPOT_DEFINED\", \"associationTypeId\": 3}]}]}",
+        "options": {}
+      },
+      "id": "50454b33-7e17-4478-8611-8c5348dc55ea",
+      "name": "HubSpot - Créer deal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2272, 256],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔔 <b>Nouveau lead {{ $('Code JS - Prépare deal').item.json.source }}</b>\n\n👤 <b>{{ $('Code JS - Prépare deal').item.json.fullName }}</b>\n📞 {{ $('Code JS - Prépare deal').item.json.phone }}\n📧 {{ $('Code JS - Prépare deal').item.json.email }}\n\n🔧 {{ $('Code JS - Prépare deal').item.json.typeFuite }}\n📍 {{ $('Code JS - Prépare deal').item.json.ville }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "cb8ab01d-6be1-4a9b-932f-098b1adad154",
+      "name": "Telegram - Notif lead",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2496, 256],
+      "webhookId": "d300b265-183e-41c2-988b-afe7e8ec6a46",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Sync leads 5min": {
+      "main": [
+        [
+          { "node": "Google Sheets - Lire leads", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Webhook - Formulaire site": {
+      "main": [
+        [
+          { "node": "Code JS - Normalise lead", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Google Sheets - Lire leads": {
+      "main": [
+        [
+          { "node": "Code JS - Filtre nouvelles lignes", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Code JS - Filtre nouvelles lignes": {
+      "main": [
+        [
+          { "node": "Code JS - Normalise lead", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Code JS - Normalise lead": {
+      "main": [
+        [
+          { "node": "HubSpot - Rechercher contact", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "HubSpot - Rechercher contact": {
+      "main": [
+        [
+          { "node": "Code JS - Contact existe ?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Code JS - Contact existe ?": {
+      "main": [
+        [
+          { "node": "Si - Nouveau ou existant ?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Si - Nouveau ou existant ?": {
+      "main": [
+        [
+          { "node": "HubSpot - Créer contact", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "HubSpot - Màj contact", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "HubSpot - Créer contact": {
+      "main": [
+        [
+          { "node": "Code JS - Prépare deal", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "HubSpot - Màj contact": {
+      "main": [
+        [
+          { "node": "Code JS - Prépare deal", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Code JS - Prépare deal": {
+      "main": [
+        [
+          { "node": "HubSpot - Créer deal", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "HubSpot - Créer deal": {
+      "main": [
+        [
+          { "node": "Telegram - Notif lead", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  }
+}

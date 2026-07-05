@@ -1,0 +1,900 @@
+{
+  "name": "BACK UP INTEGRAL HUBSPOT",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        -176
+      ],
+      "id": "c36375c6-4ab2-41f2-8b36-3e0fd39bbbc8",
+      "name": "Trigger - Backup HubSpot"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "search",
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        -176
+      ],
+      "id": "294c605d-cf90-4f51-a058-e67b1759257c",
+      "name": "Search for deals",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "get",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        -176
+      ],
+      "id": "8405e1df-f0d7-4069-9fce-424b4e60537e",
+      "name": "Get a deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "operation": "search",
+        "returnAll": true,
+        "filterGroupsUi": {
+          "filterGroupsValues": []
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        -176
+      ],
+      "id": "f0b04581-3b59-4d37-95f7-e43bd6536b2d",
+      "name": "Search contacts",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "operation": "get",
+        "contactId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "additionalFields": {
+          "propertiesCollection": {
+            "propertiesValues": {
+              "properties": [
+                "hs_additional_emails",
+                "city",
+                "closedate",
+                "company",
+                "hs_count_is_worked",
+                "hs_count_is_unworked",
+                "country",
+                "hs_country_region_code",
+                "createdate",
+                "hs_sequences_is_enrolled",
+                "date_of_birth",
+                "hs_sa_first_engagement_date",
+                "email",
+                "firstname",
+                "hs_full_name_or_email",
+                "gender",
+                "hs_is_enriched",
+                "jobtitle",
+                "hs_notes_last_activity",
+                "hs_last_sales_activity_timestamp",
+                "hs_last_sales_activity_type",
+                "lastmodifieddate",
+                "lastname",
+                "hs_lead_status",
+                "hs_notes_next_activity",
+                "notes_next_activity_date",
+                "hs_notes_next_activity_type",
+                "num_associated_deals",
+                "hs_analytics_source",
+                "hs_persona",
+                "phone",
+                "hs_pipeline",
+                "support_priority",
+                "recent_conversion_event_name",
+                "recent_deal_amount",
+                "recent_deal_close_date",
+                "societe_concernee",
+                "hs_content_membership_status",
+                "hs_unique_creation_key"
+              ]
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        -176
+      ],
+      "id": "913db252-5d72-46af-8f81-61034d1f88e7",
+      "name": "Get a contact",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "company",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "propertiesCollection": {
+            "propertiesValues": {
+              "properties": [
+                "address",
+                "address2",
+                "city",
+                "closedate",
+                "country",
+                "createdate",
+                "days_to_close",
+                "description",
+                "domain",
+                "first_deal_created_date",
+                "hs_is_enriched",
+                "hs_lead_status",
+                "hs_logo_url",
+                "hs_notes_last_activity",
+                "hs_notes_next_activity",
+                "hs_notes_next_activity_type",
+                "hs_num_child_companies",
+                "hs_num_decision_makers",
+                "hs_num_open_deals",
+                "hs_object_source",
+                "hs_object_source_detail_1",
+                "hs_object_source_detail_2",
+                "hs_object_source_detail_3",
+                "hs_object_source_label",
+                "hs_pipeline",
+                "name",
+                "num_associated_contacts",
+                "phone",
+                "recent_conversion_date",
+                "recent_conversion_event_name",
+                "zip"
+              ]
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        -176
+      ],
+      "id": "c7523bd9-1144-429a-8267-6a60a1a177c7",
+      "name": "Get many companies",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "engagement",
+        "operation": "getAll",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        2688,
+        -176
+      ],
+      "id": "8b48fbe4-1b14-45cf-99d6-25a5653ca3bc",
+      "name": "Get many engagements",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": true,
+        "additionalFields": {
+          "properties": [
+            "closed_date",
+            "content",
+            "created_by",
+            "createdate",
+            "hs_assignment_method",
+            "hs_createdate",
+            "hs_current_generic_channel_id",
+            "hs_custom_inbox",
+            "hs_customer_agent_escalated_time",
+            "hs_customer_agent_ticket_status",
+            "hs_file_upload",
+            "hs_first_agent_message_sent_at",
+            "hs_form_id",
+            "hs_has_live_chat_ended_or_email_sent",
+            "hs_form_submission_conversion_id",
+            "hs_in_helpdesk",
+            "hs_inbox_id",
+            "hs_is_closed",
+            "hs_last_closed_date",
+            "hs_last_email_activity",
+            "hs_last_email_date",
+            "hs_last_email_details",
+            "hs_last_email_type",
+            "hs_last_message_from_visitor",
+            "hs_last_message_sent_at",
+            "hs_last_message_received_at",
+            "hs_lastactivitydate",
+            "hs_notes_last_activity",
+            "hs_notes_next_activity",
+            "hs_nextactivitydate",
+            "hs_notes_next_activity_type",
+            "hs_num_associated_companies",
+            "hs_num_associated_conversations",
+            "hs_num_times_contacted",
+            "hs_object_source",
+            "hs_object_source_label",
+            "hs_outbound_ticket",
+            "hs_pinned_engagement_id",
+            "hs_pipeline",
+            "hs_pipeline_stage",
+            "hs_primary_company",
+            "hs_primary_company_id",
+            "hs_primary_company_name",
+            "hs_resolution",
+            "hs_source_url",
+            "hs_ticket_category",
+            "hs_ticket_id",
+            "hs_ticket_priority",
+            "hs_ticket_reopened_at",
+            "hs_time_to_first_assign",
+            "hs_time_to_first_rep_assignment",
+            "hs_unique_creation_key",
+            "hs_updated_by_user_id",
+            "num_notes",
+            "source_type",
+            "subject",
+            "tags",
+            "time_to_close",
+            "time_to_first_agent_reply"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        3360,
+        -176
+      ],
+      "id": "6073bf5a-3652-44cf-98ba-eb70a603ee82",
+      "name": "Get many tickets",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        3584,
+        -176
+      ],
+      "id": "5d2d39cc-f401-47fa-b5d6-f116509fe329",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2912,
+        -176
+      ],
+      "id": "f8c2ba78-9e3c-4995-bade-8ca517c077fd",
+      "name": "Convert to File1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        -176
+      ],
+      "id": "7c747a69-39b2-4456-8a3d-a0d3c4c666c4",
+      "name": "Convert to File2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        -176
+      ],
+      "id": "3bb5cd55-0dd3-4364-b674-07447cc429fa",
+      "name": "Convert to File3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        -176
+      ],
+      "id": "acdfc220-bfc3-46d5-adb1-0d28a316e385",
+      "name": "Convert to File4"
+    },
+    {
+      "parameters": {
+        "name": "=backup_hubspot_deals_{{ $now.toFormat('dd-MM-yyyy') }}.csv",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "backup_hubspot_deals",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_SHEET_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        896,
+        -176
+      ],
+      "id": "4cce7381-0833-412a-855c-fe378a1f9458",
+      "name": "Upload file4",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "=backup_hubspot_contacts_{{ $now.toFormat('dd-MM-yyyy') }}.csv",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "backup_hubspot_contacts",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_SHEET_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1792,
+        -176
+      ],
+      "id": "b0656a67-9537-40ac-ba75-0aa4a38d5dc8",
+      "name": "Upload file3",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "=backup_hubspot_engagements_{{ $now.toFormat('dd-MM-yyyy') }}.csv",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "backup_hubspot_engagements",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_SHEET_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3136,
+        -176
+      ],
+      "id": "05312606-26e9-4f1b-b95c-e7cdce699c9b",
+      "name": "Upload file1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "=backup_hubspot_company_{{ $now.toFormat('dd-MM-yyyy') }}.csv",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "backup_hubspot_company",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_SHEET_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2464,
+        -176
+      ],
+      "id": "2824314c-df25-429d-b0e2-96d7ebe4ad30",
+      "name": "Upload file2",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "=backup_hubspot_tickets_{{ $now.toFormat('dd-MM-yyyy') }}.csv",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "backup_hubspot_tickets",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_SHEET_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3808,
+        -176
+      ],
+      "id": "c49100b2-acfe-4e87-8356-d298b8c7bd6d",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Calculer la date d'il y a exactement 1 mois\nconst thresholdDate = new Date();\nthresholdDate.setMonth(thresholdDate.getMonth() - 1);\n\nconst filesToDelete = [];\n// Regex pour cibler les fichiers (le \"i\" à la fin gère .csv et .CSV)\nconst dateRegex = /(\\d{2}-\\d{2}-\\d{4})\\.csv$/i;\n\nfor (const item of $input.all()) {\n  // Sécurité : on passe au fichier suivant s'il n'y a pas de nom\n  if (!item.json || !item.json.name) continue;\n\n  // On FORCE le nom du fichier à être interprété comme du texte (String)\n  const fileName = String(item.json.name);\n  const match = fileName.match(dateRegex);\n\n  // Si on trouve bien une date\n  if (match && match.length > 1) {\n    const dateString = match; // \"06-04-2026\"\n    \n    // On s'assure une dernière fois que c'est bien une chaîne de caractères\n    if (typeof dateString === 'string') {\n      \n      // On découpe la date et on stocke le résultat dans un tableau classique\n      const dateParts = dateString.split('-');\n      \n      // Si on a bien 3 morceaux (Jour, Mois, Année)\n      if (dateParts.length === 3) {\n        // On convertit les morceaux de texte en vrais nombres avec parseInt\n        const day = parseInt(dateParts, 10);\n        const month = parseInt(dateParts, 10);\n        const year = parseInt(dateParts, 10);\n        \n        // Création de la date (les mois commencent à 0 en JS, d'où month - 1)\n        const fileDate = new Date(year, month - 1, day);\n\n        // Si la date du fichier est STRICTEMENT plus vieille qu'un mois\n        if (fileDate < thresholdDate) {\n          filesToDelete.push(item);\n        }\n      }\n    }\n  }\n}\n\nreturn filesToDelete;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4544,
+        -176
+      ],
+      "id": "358fb7b8-df01-4c77-8b09-f75b3dba8000",
+      "name": "Code JS - Filtre fichiers anciens"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "YOUR_GOOGLE_SHEET_ID",
+            "mode": "list",
+            "cachedResultName": "BACK UP HUBSPOT",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_SHEET_ID"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        4096,
+        -176
+      ],
+      "id": "7ea8aa39-3f72-428b-af23-b9e8d2b00e62",
+      "name": "Search files and folders2",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        4320,
+        -176
+      ],
+      "id": "3c95b5c9-357f-4343-835e-78b0baf84179",
+      "name": "Search files and folders",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        4768,
+        -176
+      ],
+      "id": "54ba7708-a478-431c-a6ab-ffe430b96434",
+      "name": "Delete a file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Backup HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Search for deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search for deals": {
+      "main": [
+        [
+          {
+            "node": "Get a deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a deal": {
+      "main": [
+        [
+          {
+            "node": "Convert to File4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search contacts": {
+      "main": [
+        [
+          {
+            "node": "Get a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a contact": {
+      "main": [
+        [
+          {
+            "node": "Convert to File3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many companies": {
+      "main": [
+        [
+          {
+            "node": "Convert to File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many engagements": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many tickets": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File1": {
+      "main": [
+        [
+          {
+            "node": "Upload file1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File2": {
+      "main": [
+        [
+          {
+            "node": "Upload file2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File3": {
+      "main": [
+        [
+          {
+            "node": "Upload file3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File4": {
+      "main": [
+        [
+          {
+            "node": "Upload file4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file4": {
+      "main": [
+        [
+          {
+            "node": "Search contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file3": {
+      "main": [
+        [
+          {
+            "node": "Get many companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file1": {
+      "main": [
+        [
+          {
+            "node": "Get many tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file2": {
+      "main": [
+        [
+          {
+            "node": "Get many engagements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Filtre fichiers anciens": {
+      "main": [
+        [
+          {
+            "node": "Delete a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search files and folders2": {
+      "main": [
+        [
+          {
+            "node": "Search files and folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search files and folders": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Filtre fichiers anciens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Search files and folders2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

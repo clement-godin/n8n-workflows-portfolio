@@ -1,0 +1,359 @@
+{
+  "name": "SCAN TICKET ET ETIQUETTE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 96],
+      "id": "f24be8ec-9e36-405b-9020-04a6986711ce",
+      "name": "Trigger - Scan ticket/étiquette",
+      "webhookId": "5c2093f3-1374-4611-aebf-7de372e4b429",
+      "credentials": {
+        "telegramApi": {
+          "id": "2nU92hiRBbeCt8I6",
+          "name": "scan_ticket_etiquette_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "9d5ded42-6144-4317-95f7-3953c2d5fd5d",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "texte",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [448, 96],
+      "id": "6465a8f5-7b6b-427c-a734-c59799fe4c7b",
+      "name": "Si - Est texte ou image ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Nœud Code JS — Mémo magasin\n$getWorkflowStaticData('global').magasinMemo = $json.magasinMemo;\nreturn [{ json: { stored: true, magasin: $json.magasinMemo } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, -96],
+      "id": "cd6e9080-82b9-4262-8f8a-2a18a0b73cec",
+      "name": "Code JS - Mémo magasin"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=✅ Magasin mémorisé : {{ $json.magasin }} Envoie maintenant la photo ou le PDF.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [896, -96],
+      "id": "daf02a7e-e3ea-4f27-aa0d-bbca869429a3",
+      "name": "Telegram - Confirme mémo magasin",
+      "webhookId": "edda859a-6028-477c-b83e-94f413f15b84",
+      "credentials": {
+        "telegramApi": {
+          "id": "2nU92hiRBbeCt8I6",
+          "name": "scan_ticket_etiquette_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Code JS - Détecte').item.json.fileId }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [672, 96],
+      "id": "a6303d72-f902-4859-b6f9-6677ce1b147a",
+      "name": "Telegram - Récupère fichier",
+      "webhookId": "924be743-9b4f-4db7-af55-4eb1a1eee733",
+      "credentials": {
+        "telegramApi": {
+          "id": "2nU92hiRBbeCt8I6",
+          "name": "scan_ticket_etiquette_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var msg     = $input.first().json.message;\nvar type    = 'unknown';\nvar fileId  = null;\nvar texte   = msg.text || msg.caption || '';\nvar magasinMemo = texte.trim();\n\nif (msg.photo) {\n  var photos = msg.photo;\n  fileId = photos[photos.length - 1].file_id;\n  type = 'photo';\n} else if (msg.document) {\n  var mime = msg.document.mime_type || '';\n  fileId = msg.document.file_id;\n  type = mime.includes('pdf') ? 'pdf' : 'document';\n} else if (msg.text) {\n  type = 'texte';\n}\n\nreturn [{\n  json: {\n    type:        type,\n    fileId:      fileId,\n    magasinMemo: magasinMemo,\n    chatId:      msg.chat.id,\n    messageId:   msg.message_id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 96],
+      "id": "2f676f15-d750-4012-ac24-61bdcf602098",
+      "name": "Code JS - Détecte"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "comparatif des liste de courses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [896, 288],
+      "id": "c8901a41-b123-4269-9ab4-f7b334fa52fd",
+      "name": "Google Sheets - Existants",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1568, 192],
+      "id": "a0bd07bc-6f0f-441f-8f0b-b59610b031d8",
+      "name": "API Claude - Analyse image/PDF",
+      "credentials": {
+        "anthropicApi": {
+          "id": "8Wcb8jgMTJM6CQjM",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var raw = $input.first().json.content[0].text.trim()\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/i, '')\n  .replace(/```\\s*$/i, '');\n\n\nvar parsed = JSON.parse(raw);\n\n\nvar date    = parsed.date || new Date().toLocaleDateString('fr-FR');\nvar magasin = parsed.magasin || '';\nvar articles = parsed.articles || [];\n\n// Retourne une ligne par article pour Google Sheets\nreturn articles.map(function(a) {\n  return {\n    json: {\n      magasin,\n      date,\n      categorie:    a.categorie || '',\n      nom:          a.nom || a.nom_exact || '',\n      nom_exact:    a.nom_exact || '',\n      prix_unitaire: a.prix_unitaire || '',\n      prix_kg:      a.prix_kg || '',\n      poids:        a.poids || '',\n      nb_articles:  articles.length\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1792, 192],
+      "id": "f9f6ceda-f3ec-4430-ba3b-c88d77d3e5da",
+      "name": "Code JS - Parse + Structure lignes"
+    },
+    {
+      "parameters": {
+        "jsCode": "var all = $input.all();\n\nvar fileInfo = null;\nvar rows = [];\n\nall.forEach(function(item) {\n  var d = item.json;\n  if (d.result && d.result.file_path) {\n    fileInfo = d.result;\n  } else if (d['Nom exact de l\\'article']) {\n    rows.push(d);\n  }\n});\n\nvar fileType  = $('Code JS - Détecte').first().json.type;\nvar mediaType = fileType === 'pdf' ? 'application/pdf' : 'image/jpeg';\nvar contentType = fileType === 'pdf' ? 'document' : 'image';\nvar base64 = $input.first().json.imageBase64;\n\nvar magasin = $('Code JS - Détecte').first().json.magasinMemo\n            || $getWorkflowStaticData('global').magasinMemo\n            || '';\n\nvar categoriesExistantes = [...new Set(\n  rows.map(function(r) { return r['Catégorie']; }).filter(Boolean)\n)];\n\nvar produitsExistants = [...new Set(\n  rows.map(function(r) { return r['Nom exact de l\\'article']; }).filter(Boolean)\n)].slice(0, 80);\n\nvar contexteMagasin = magasin ? 'Magasin : ' + magasin + '\\n' : '';\n\nvar body = {\n  model: \"claude-sonnet-4-20250514\",\n  max_tokens: 4000,\n  system:\n    'Tu es un assistant d\\'analyse de tickets de caisse et d\\'étiquettes produit. ' +\n    'Si le prix unitaire est affiché et que le poids est connu, calcule le prix au kg (prix_unitaire / poids_en_kg).\\n' +\n    'Si seul le prix au kg est affiché, calcule le prix unitaire (prix_kg × poids_en_kg).\\n' +\n    'Retourne toujours les deux champs prix_unitaire ET prix_kg quand l\\'un des deux est calculable.\\n' +\n    'Exemple : prix_unitaire=4.75, poids=500g → prix_kg=9.50\\n' +\n    'Tu extrais les données structurées et normalises les noms selon les existants. ' +\n    'Tu réponds UNIQUEMENT en JSON valide sans backticks.\\n\\n' +\n    'Catégories existantes à utiliser en priorité : ' + categoriesExistantes.join(', ') + '\\n' +\n    'Produits existants (pour uniformiser les noms) : ' + produitsExistants.join(', '),\n  messages: [{\n    role: \"user\",\n    content: [\n      {\n        type: contentType,\n        source: {\n          type: \"base64\",\n          media_type: mediaType,\n          data: base64\n        }\n      },\n      {\n        type: \"text\",\n        text: contexteMagasin +\n          'Analyse cette image et extrait TOUS les articles.\\n\\n' +\n          'Retourne ce JSON :\\n' +\n          '{\"magasin\":\"...\",\"date\":\"JJ/MM/AAAA\",\"articles\":[{\"categorie\":\"...\",\"nom\":\"...\",\"nom_exact\":\"...\",\"prix_unitaire\":null,\"prix_kg\":null,\"poids\":null}]}'\n      }\n    ]\n  }]\n};\n\nreturn [{\n  json: {\n    body: body\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1344, 192],
+      "id": "0a0c6e4c-1ccd-42cb-9bed-3ff37cef057e",
+      "name": "Code JS - Prépare prompt Claude"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "comparatif des liste de courses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Magasin": "= {{ $json.magasin }}",
+            "Catégorie": "={{ $json.categorie }}",
+            "Nom exact de l'article": "={{ $json.nom }}",
+            "Prix unitaire": "={{ $json.prix_unitaire }}",
+            "Prix au kg": "={{ $json.prix_kg }}",
+            "Poids": "={{ $json.poids }}",
+            "Date": "={{ $json.date === 'Non spécifiée' || $json.date === 'Non disponible' ? $now.toFormat('dd/MM/yyyy') : $json.date }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Catégorie", "displayName": "Catégorie", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Date", "displayName": "Date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Magasin", "displayName": "Magasin", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Nom exact de l'article", "displayName": "Nom exact de l'article", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Prix au kg", "displayName": "Prix au kg", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Prix unitaire", "displayName": "Prix unitaire", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Poids", "displayName": "Poids", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2016, 192],
+      "id": "3bfec90b-6842-40b7-aff6-4bd9a321d9a8",
+      "name": "Sheets - Enregistre articles",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var items = $('Code JS - Parse + Structure lignes').all();\nvar first = items[0].json;\nvar nb    = items.length;\n\nreturn [{\n  json: {\n    chatId:  'YOUR_TELEGRAM_CHAT_ID',\n    message: '✅ <b>' + nb + ' article' + (nb > 1 ? 's' : '') + ' enregistré' + (nb > 1 ? 's' : '') + '</b>\\n' +\n             '🏪 ' + (first.magasin || 'Magasin non précisé') + ' · 📅 ' + (first.date || 'Date non précisée')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 192],
+      "id": "c77db25d-35f6-4bf2-8e2e-2a9d9eadc877",
+      "name": "Code JS - Prépare confirmation"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2464, 192],
+      "id": "05b71506-ef7a-4b2f-8940-c16b7d3f764c",
+      "name": "Telegram - Envoie confirmation",
+      "webhookId": "c0e9d6b6-ce1e-438b-9e8b-5c2568af4e09",
+      "credentials": {
+        "telegramApi": {
+          "id": "2nU92hiRBbeCt8I6",
+          "name": "scan_ticket_etiquette_bot"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [1120, 192],
+      "id": "76a62559-70f2-4bb1-aa49-5d7ba0cd28e6",
+      "name": "Merge - Fichier + Existants"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "destinationKey": "imageBase64",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [896, 96],
+      "id": "22919468-8053-4522-b256-4d982e92d004",
+      "name": "Prépare - Encode base64"
+    }
+  ],
+  "connections": {
+    "Trigger - Scan ticket/étiquette": {
+      "main": [[{ "node": "Code JS - Détecte", "type": "main", "index": 0 }]]
+    },
+    "Si - Est texte ou image ?": {
+      "main": [
+        [{ "node": "Code JS - Mémo magasin", "type": "main", "index": 0 }],
+        [
+          { "node": "Telegram - Récupère fichier", "type": "main", "index": 0 },
+          { "node": "Google Sheets - Existants", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Code JS - Mémo magasin": {
+      "main": [[{ "node": "Telegram - Confirme mémo magasin", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Récupère fichier": {
+      "main": [[{ "node": "Prépare - Encode base64", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Détecte": {
+      "main": [[{ "node": "Si - Est texte ou image ?", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets - Existants": {
+      "main": [[{ "node": "Merge - Fichier + Existants", "type": "main", "index": 1 }]]
+    },
+    "API Claude - Analyse image/PDF": {
+      "main": [[{ "node": "Code JS - Parse + Structure lignes", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Prépare prompt Claude": {
+      "main": [[{ "node": "API Claude - Analyse image/PDF", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Parse + Structure lignes": {
+      "main": [[{ "node": "Sheets - Enregistre articles", "type": "main", "index": 0 }]]
+    },
+    "Sheets - Enregistre articles": {
+      "main": [[{ "node": "Code JS - Prépare confirmation", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Prépare confirmation": {
+      "main": [[{ "node": "Telegram - Envoie confirmation", "type": "main", "index": 0 }]]
+    },
+    "Merge - Fichier + Existants": {
+      "main": [[{ "node": "Code JS - Prépare prompt Claude", "type": "main", "index": 0 }]]
+    },
+    "Prépare - Encode base64": {
+      "main": [[{ "node": "Merge - Fichier + Existants", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

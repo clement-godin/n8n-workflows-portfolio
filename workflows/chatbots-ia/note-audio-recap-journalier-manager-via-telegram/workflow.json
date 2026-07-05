@@ -1,0 +1,583 @@
+{
+  "name": "NOTE AUDIO RECAP JOURNALIER MANAGER VIA TELEGRAM",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        192
+      ],
+      "id": "18b61164-71f8-489e-8132-37dcf52bad10",
+      "name": "Trigger - Note audio/texte manager",
+      "webhookId": "062adfaf-753f-480d-aa44-e00d847a57a8",
+      "credentials": {
+        "telegramApi": {
+          "id": "zCGc5Cv5TDV2CkNA",
+          "name": "@assistant_trancript_vocal_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        672,
+        96
+      ],
+      "id": "26ab721a-665a-40b8-925f-b83f23d192ba",
+      "name": "OpenAI - Transcrit vocal",
+      "credentials": {
+        "openAiApi": {
+          "id": "9LS6CDaep0lZZnNq",
+          "name": "OpenAi perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Note audio/texte manager').item.json.message.chat.id }}",
+        "text": "=Voici ce que j'ai compris : {{ $json.text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Valider",
+                    "additionalFields": {
+                      "callback_data": "valider_audio"
+                    }
+                  },
+                  {
+                    "text": "Recommencer",
+                    "additionalFields": {
+                      "callback_data": "annuler_audio"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        96
+      ],
+      "id": "1ea3fb5e-99d7-46a3-bcb2-6748064b415a",
+      "name": "Telegram - Montre transcription",
+      "webhookId": "6c389d7d-5849-475f-b891-b9cdd89f1407",
+      "credentials": {
+        "telegramApi": {
+          "id": "zCGc5Cv5TDV2CkNA",
+          "name": "@assistant_trancript_vocal_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        96
+      ],
+      "id": "e3a4e716-d84c-492e-91b6-c110a2c6f51f",
+      "name": "Telegram - Récupère vocal",
+      "webhookId": "391d9ed9-ce0b-494f-b005-78758cab272f",
+      "credentials": {
+        "telegramApi": {
+          "id": "zCGc5Cv5TDV2CkNA",
+          "name": "@assistant_trancript_vocal_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    },
+                    "id": "accc899b-a474-46c8-8a11-272517b7a534"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e18bab8e-94d4-4312-978a-30938d060984",
+                    "leftValue": "={{ $json.message.voice }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "65e3444c-6947-478a-8d94-59857ede46d6",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "valider_audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio OK"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "db66a638-4f2d-4e24-b1ea-6b92b2391100",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "annuler_audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio pas OK"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        224,
+        160
+      ],
+      "id": "e0a96e84-1342-4a41-b821-4c40bfe5842c",
+      "name": "Switch - Type note audio"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Note audio/texte manager').item.json.callback_query.message.chat.id }}",
+        "text": "=Ok, j'annule. Envoie-moi un nouveau vocal !",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        480
+      ],
+      "id": "3c29af8a-caa2-48ee-8eef-b17a5be935ed",
+      "name": "Telegram - Annule vocal",
+      "webhookId": "6c389d7d-5849-475f-b891-b9cdd89f1407",
+      "credentials": {
+        "telegramApi": {
+          "id": "zCGc5Cv5TDV2CkNA",
+          "name": "@assistant_trancript_vocal_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Switch - Type note audio').item.json.callback_query.message.chat.id }}",
+        "text": "=la note est enregistré",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        288
+      ],
+      "id": "822ceb18-1e01-4eb2-83a6-407302832a41",
+      "name": "Telegram - Confirme note audio",
+      "webhookId": "6c389d7d-5849-475f-b891-b9cdd89f1407",
+      "credentials": {
+        "telegramApi": {
+          "id": "zCGc5Cv5TDV2CkNA",
+          "name": "@assistant_trancript_vocal_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Note audio/texte manager').item.json.message.chat.id }}",
+        "text": "=la note est enregistré",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        -96
+      ],
+      "id": "26816648-49cd-4d1d-ac7a-fab62cdd6978",
+      "name": "Telegram - Confirme note texte",
+      "webhookId": "6c389d7d-5849-475f-b891-b9cdd89f1407",
+      "credentials": {
+        "telegramApi": {
+          "id": "zCGc5Cv5TDV2CkNA",
+          "name": "@assistant_trancript_vocal_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "heure": "={{ DateTime.fromSeconds(\n\n$json.callback_query.message.date\n\n).setZone('Europe/Paris').format('HH:mm:ss') }}",
+            "date": "={{ DateTime.fromSeconds( \n\n$json.callback_query.message.date\n\n).setZone('Europe/Paris').format('dd-MM-yyyy') }}",
+            "note transcript": "={{ $json.callback_query.message.text.replace(/^Voici ce que j'ai compris\\s*:\\s*/i, \"\") }}",
+            "statut": "A ENVOYER"
+          },
+          "matchingColumns": [
+            "date"
+          ],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "heure",
+              "displayName": "heure",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "note transcript",
+              "displayName": "note transcript",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "statut",
+              "displayName": "statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        288
+      ],
+      "id": "969491e9-022c-40c8-89af-72d96ca72d68",
+      "name": "Sheets - Enregistre note audio",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "heure": "={{ DateTime.fromSeconds($json.message.date).setZone('Europe/Paris').format('HH:mm:ss') }}",
+            "date": "={{ DateTime.fromSeconds( $json.message.date ).setZone('Europe/Paris').format('dd-MM-yyyy') }}",
+            "note transcript": "={{ $json.message.text.replace(/^Voici ce que j'ai compris\\s*:\\s*/i, \"\").trim() }}",
+            "statut": "A ENVOYER"
+          },
+          "matchingColumns": [
+            "date"
+          ],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "heure",
+              "displayName": "heure",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "note transcript",
+              "displayName": "note transcript",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "statut",
+              "displayName": "statut",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "86520763-e4fb-4cba-bc92-3c04de7c4f5f",
+      "name": "Sheets - Enregistre note texte",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Note audio/texte manager": {
+      "main": [
+        [
+          {
+            "node": "Switch - Type note audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Transcrit vocal": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Montre transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Récupère vocal": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Transcrit vocal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Type note audio": {
+      "main": [
+        [
+          {
+            "node": "Sheets - Enregistre note texte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - Récupère vocal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets - Enregistre note audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - Annule vocal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets - Enregistre note audio": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Confirme note audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets - Enregistre note texte": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Confirme note texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

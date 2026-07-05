@@ -1,0 +1,299 @@
+{
+  "name": "Workflow 3 — \"Prospection Partenaires — Résultats Appels",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.interesse }}",
+                    "rightValue": "completed",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "c3cde738-0cbb-4550-b27a-97d8d05e0045"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "interesse"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "db1281ea-99c8-4e5e-8633-11b5c4ce4ec2",
+                    "leftValue": "={{ $json.interesse }}",
+                    "rightValue": "no-answer",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "non_interesse"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "contact_etabli"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        464,
+        208
+      ],
+      "id": "2fc45609-69d4-4cb9-b2b3-87050b5563df",
+      "name": "Switch - Résultat appel"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.deal_id }}",
+          "mode": "id"
+        },
+        "updateFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        688,
+        224
+      ],
+      "id": "5b555d5b-5c71-40d1-aa83-5995fdc70f43",
+      "name": "HubSpot - Màj deal intéressé",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "twilio-call-result",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        224
+      ],
+      "id": "14e428a1-2635-4ddd-a339-28acad442edf",
+      "name": "Webhook - Résultats appels partenaires",
+      "webhookId": "51542dab-9bd2-4870-ab2c-dcb5dc50599f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "f50faa30-503a-4665-a188-b3304c799307",
+              "leftValue": "={{ $json.body.company_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        16,
+        224
+      ],
+      "id": "723e608a-0fde-417d-8cf3-716426100a6d",
+      "name": "Si - Appel abouti ?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "43047d38-b1bb-4988-a013-a9af9e772691",
+              "name": "company_id",
+              "value": "={{ $json.body.company_id }}",
+              "type": "string"
+            },
+            {
+              "id": "3c867183-53c1-4884-be18-74d7cdb61033",
+              "name": "interesse",
+              "value": "={{ $json.body.interesse }}",
+              "type": "string"
+            },
+            {
+              "id": "9ee4f792-40c7-4032-a49b-f17a3a604b17",
+              "name": "nom_contact",
+              "value": "={{ $json.body.nom_contact ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "42f8326c-f4fb-43c5-8793-1fd4d0580cc8",
+              "name": "email",
+              "value": "={{ $json.body.email_contact ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "46aaf38d-51a3-4010-967c-9c499fd37b19",
+              "name": "resume",
+              "value": "={{ $json.body.resume ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "10b52fe4-8e1d-46a4-b6b0-7a69a3b549a4",
+              "name": "call_sid",
+              "value": "={{ $json.body.call_sid }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        224
+      ],
+      "id": "c9db4854-1c67-4e33-b202-98356a713f77",
+      "name": "Prépare - Données résultat"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.deal_id }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "stage": ""
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        688,
+        416
+      ],
+      "id": "c6b8d6c0-dd20-4394-b081-ba71ac0a662f",
+      "name": "HubSpot - Màj deal non intéressé",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Switch - Résultat appel": {
+      "main": [
+        [],
+        [
+          {
+            "node": "HubSpot - Màj deal intéressé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HubSpot - Màj deal non intéressé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Résultats appels partenaires": {
+      "main": [
+        [
+          {
+            "node": "Si - Appel abouti ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Appel abouti ?": {
+      "main": [
+        [
+          {
+            "node": "Prépare - Données résultat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prépare - Données résultat": {
+      "main": [
+        [
+          {
+            "node": "Switch - Résultat appel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

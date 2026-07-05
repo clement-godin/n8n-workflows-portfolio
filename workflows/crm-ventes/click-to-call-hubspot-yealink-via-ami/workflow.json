@@ -1,0 +1,68 @@
+{
+  "name": "Click-to-call HubSpot → Yealink via AMI",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "click-to-call",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook - Click-to-call HubSpot",
+      "type": "n8n-nodes-base.webhook",
+      "position": [0, 0],
+      "id": "9b483b20-ff20-4fbf-9fc4-d86fcf549e65",
+      "typeVersion": 2.1,
+      "webhookId": "8d266eae-eb53-4f3c-96f7-09cbcc37c07a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// Récupération du numéro (plus lisible + évite répétition)\nconst rawNumero = input.body?.phone_number || input.phone_number || '';\n\n// Normalisation au format E.164 (France)\nlet normalized = rawNumero.replace(/[^0-9+]/g, '');\n\nif (normalized.startsWith('0')) {\n  normalized = '+33' + normalized.slice(1);\n} else if (!normalized.startsWith('+')) {\n  normalized = '+33' + normalized;\n}\n\n// Résultat\nreturn [\n  {\n    json: {\n      numero_client: normalized,\n      poste_assistante: 'SIP/100',\n      contact_name: input.contact_name || 'Client',\n      hubspot_contact_id: input.contact_id || '',\n    },\n  },\n];"
+      },
+      "name": "Code JS - Valide et formate numéro",
+      "type": "n8n-nodes-base.code",
+      "position": [224, 0],
+      "id": "3c423ed1-295d-4834-b6c0-9b45d7ab3aa1",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const net = require('net');\n\nconst AMI_HOST = 'YOUR_FREEPBX_HOST';\nconst AMI_PORT = 5038;\nconst AMI_USER = 'YOUR_AMI_USERNAME';\nconst AMI_PASS = 'YOUR_AMI_PASSWORD';\n\nconst { numero_client: numero, poste_assistante: poste, contact_name: nom } =\n  $input.first().json;\n\nreturn new Promise((resolve, reject) => {\n  const client = new net.Socket();\n\n  let buffer = '';\n  let loggedIn = false;\n\n  // Connexion au serveur AMI\n  client.connect(AMI_PORT, AMI_HOST, () => {\n    const loginAction =\n      `Action: Login\\r\\n` +\n      `Username: ${AMI_USER}\\r\\n` +\n      `Secret: ${AMI_PASS}\\r\\n\\r\\n`;\n\n    client.write(loginAction);\n  });\n\n  client.on('data', (data) => {\n    buffer += data.toString();\n\n    // Authentification OK → lancer l'appel\n    if (!loggedIn && buffer.includes('Authentication accepted')) {\n      loggedIn = true;\n\n      const originateAction =\n        `Action: Originate\\r\\n` +\n        `Channel: ${poste}\\r\\n` +\n        `Exten: ${numero}\\r\\n` +\n        `Context: from-internal\\r\\n` +\n        `Priority: 1\\r\\n` +\n        `CallerID: ${nom} <${numero}>\\r\\n` +\n        `Timeout: 30000\\r\\n` +\n        `Async: true\\r\\n\\r\\n`;\n\n      client.write(originateAction);\n    }\n\n    // Succès → on ferme proprement\n    if (loggedIn && buffer.includes('Response: Success')) {\n      client.write('Action: Logoff\\r\\n\\r\\n');\n      client.destroy();\n\n      resolve([\n        {\n          json: {\n            success: true,\n            numero,\n            poste,\n          },\n        },\n      ]);\n    }\n\n    // Erreur AMI\n    if (buffer.includes('Response: Error')) {\n      client.destroy();\n      reject(new Error(`AMI Originate failed: ${buffer}`));\n    }\n  });\n\n  client.on('error', (err) => {\n    client.destroy();\n    reject(err);\n  });\n\n  // Timeout sécurité\n  setTimeout(() => {\n    client.destroy();\n    reject(new Error('AMI timeout'));\n  }, 10000);\n});"
+      },
+      "name": "Code JS - AMI Originate",
+      "type": "n8n-nodes-base.code",
+      "position": [448, 0],
+      "id": "0b8c7467-232f-40f4-b84a-51859b6f67f3",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Webhook - Répond à HubSpot",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [672, 0],
+      "id": "b3237eb8-8e7e-4b34-876f-582f1e7f25c3",
+      "typeVersion": 1.5
+    }
+  ],
+  "connections": {
+    "Webhook - Click-to-call HubSpot": {
+      "main": [[{ "node": "Code JS - Valide et formate numéro", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Valide et formate numéro": {
+      "main": [[{ "node": "Code JS - AMI Originate", "type": "main", "index": 0 }]]
+    },
+    "Code JS - AMI Originate": {
+      "main": [[{ "node": "Webhook - Répond à HubSpot", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

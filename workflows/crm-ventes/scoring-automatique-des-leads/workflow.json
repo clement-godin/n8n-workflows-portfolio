@@ -1,0 +1,281 @@
+{
+  "name": "SCORING AUTOMATIQUE DES LEADS",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "lead-scoring'",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 96],
+      "id": "3373be67-dd91-4144-a42b-121b52d5f2f7",
+      "name": "Webhook - Scoring lead",
+      "webhookId": "7379344f-1549-4efd-b170-617223bc5012",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "claude-haiku-4-5-20251001"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Analyse ce lead :\\nNom : {{ $json.name }}\\nVille : {{ $json.city }}\\nUrgence déclarée : {{ $json.urgency }}\\nBudget : {{ $json.budget }}\\nDescription : {{ $json.description }}"
+            }
+          ]
+        },
+        "options": {
+          "system": "Tu es un assistant de qualification de leads pour EMA Fuites, entreprise de détection de fuite d'eau dans les Hauts-de-France. Tu analyses les demandes entrantes et retournes UNIQUEMENT un objet JSON valide, sans texte avant ni après, sans backticks.\\n\\nCritères de scoring :\\n- score : entier de 1 à 10\\n- priorite : 'URGENT' | 'HAUTE' | 'NORMALE' | 'BASSE'\\n- raison : string courte (max 15 mots)\\n- intervention_estimee : 'Aujourd\\\\'hui' | 'Cette semaine' | 'Sous 15 jours'\\n- valeur_estimee : 'Faible (<200€)' | 'Moyenne (200-500€)' | 'Élevée (>500€)'\\n\\nLogique :\\n- Score 8-10 : fuite active, dégât visible, urgence déclarée, assurance impliquée\\n- Score 5-7 : infiltration, humidité, suspicion de fuite\\n- Score 1-4 : simple renseignement, hors zone, budget très faible",
+          "maxTokens": 300
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [224, 96],
+      "id": "51748061-075b-4325-be48-5f43ca535695",
+      "name": "Claude - Score lead IA",
+      "credentials": {
+        "anthropicApi": {
+          "id": "RZVOt3bK3EJAJe4E",
+          "name": "CLE API LANDING RENO ANTHROPIC"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst lead = $('Webhook - Scoring lead').first().json;\n\n// Extraire le texte de la réponse Claude\nconst rawText = response.content[0].text.trim();\n\nlet scoring;\ntry {\n  scoring = JSON.parse(rawText);\n} catch (e) {\n  // Fallback si JSON malformé\n  scoring = {\n    score: 5,\n    priorite: 'NORMALE',\n    raison: 'Erreur de parsing — vérification manuelle requise',\n    intervention_estimee: 'Cette semaine',\n    valeur_estimee: 'Moyenne (200-500€)'\n  };\n}\n\nreturn [{\n  json: {\n    lead_id:               lead.id,\n    lead_name:             lead.name,\n    lead_phone:            lead.phone,\n    lead_city:             lead.city,\n    lead_description:      lead.description,\n    score:                 scoring.score,\n    priorite:              scoring.priorite,\n    raison:                scoring.raison,\n    intervention_estimee:  scoring.intervention_estimee,\n    valeur_estimee:        scoring.valeur_estimee\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [576, 96],
+      "id": "3fee0fab-35f2-4b15-90bd-feb384eb6d0e",
+      "name": "Code JS - Parse score Claude"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.priorite }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Telegram URGENT"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "419b0733-c17b-4fb4-bf58-e64b95e8f681",
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Telegram HAUTE"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "6d99c041-afd4-4fdb-9071-122a32b8d8b6",
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Telegram NORMALE/BASSE "
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [800, 80],
+      "id": "8886ec5e-092d-4f1b-9c05-5e39cf996275",
+      "name": "Switch - Priorité lead"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔴 LEAD URGENT — Score {{ $json.score }}/10\n\n👤 {{ $json.lead_name }} — {{ $json.lead_city }}\n📞 {{ $json.lead_phone }}\n💬 {{ $json.lead_description }}\n\n⚡ Intervention : {{ $json.intervention_estimee }}\n💶 Valeur est.  : {{ $json.valeur_estimee }}\n📌 {{ $json.raison }}\n\n👉 À rappeler dans l'heure",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1024, -96],
+      "id": "71b6477b-7223-497f-9639-4a078c40d92b",
+      "name": "Telegram - Notif lead urgent",
+      "webhookId": "09dbd893-e16e-4123-8455-25c0bbb6e084",
+      "credentials": {
+        "telegramApi": {
+          "id": "RaG5QR5En7OmVEPM",
+          "name": "scoring_lead_auto_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🟠 Nouveau lead — Score {{ $json.score }}/10\n\n👤 {{ $json.lead_name }} — {{ $json.lead_city }}\n📞 {{ $json.lead_phone }}\n💬 {{ $json.lead_description }}\n\n⏱ Intervention : {{ $json.intervention_estimee }}\n💶 Valeur est.  : {{ $json.valeur_estimee }}\n📌 {{ $json.raison }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1024, 96],
+      "id": "467da3ad-1b03-4416-a13e-af44d669617d",
+      "name": "Telegram - Notif lead haute",
+      "webhookId": "09dbd893-e16e-4123-8455-25c0bbb6e084",
+      "credentials": {
+        "telegramApi": {
+          "id": "ANwJJzGIjJRpbpNN",
+          "name": "Transcription_audio_n8n_clem_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🟡 Lead entrant — Score {{ $json.score }}/10\n\n👤 {{ $json.lead_name }} — {{ $json.lead_city }}\n📞 {{ $json.lead_phone }}\n\n📌 {{ $json.raison }}\n⏱ {{ $json.intervention_estimee }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1024, 288],
+      "id": "1bd02875-0636-418f-ae26-2016c1a74c7f",
+      "name": "Telegram - Notif lead normale",
+      "webhookId": "09dbd893-e16e-4123-8455-25c0bbb6e084",
+      "credentials": {
+        "telegramApi": {
+          "id": "RaG5QR5En7OmVEPM",
+          "name": "scoring_lead_auto_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Scoring lead": {
+      "main": [
+        [
+          {
+            "node": "Claude - Score lead IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Score lead IA": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Parse score Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Parse score Claude": {
+      "main": [
+        [
+          {
+            "node": "Switch - Priorité lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Priorité lead": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Notif lead urgent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - Notif lead haute",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - Notif lead normale",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["HUBSPOT", "CRM & VENTES"]
+}

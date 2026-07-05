@@ -1,0 +1,505 @@
+{
+  "name": "EMAFUITES - Optimisation tournée",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "c782a987-ee01-4340-bccc-cca24cd0a0bc",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -128
+      ],
+      "id": "1e67caca-224f-4335-b2a6-555cea986ab7",
+      "name": "Webhook - Optimisation tournée",
+      "webhookId": "c782a987-ee01-4340-bccc-cca24cd0a0bc",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "761eb299-9dfd-4613-85af-b8f611169961",
+              "leftValue": "={{ $json.properties.rdv_date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ada40a7a-6a2e-4cb2-9499-456cc521354d",
+              "leftValue": "={{ $json.properties.rdv_adresse }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        -128
+      ],
+      "id": "d05f0e98-458a-4298-8d26-2dd7ebc47432",
+      "name": "Si - RDV complet"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "b6586e11-9ff4-4085-9c08-7c1d65b82b02",
+              "leftValue": "={{ $json.properties.rdv_lat }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        -128
+      ],
+      "id": "1d9f84c3-5147-4241-b01d-dd6946947e35",
+      "name": "Si - Coords manquantes"
+    },
+    {
+      "parameters": {
+        "url": "https://nominatim.openstreetmap.org/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "EMAFUITES-n8n/1.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('HubSpot Trigger').first().json.properties.rdv_adresse }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        -192
+      ],
+      "id": "f906507e-93d0-492a-8a50-f7fd627fd052",
+      "name": "HTTP Request - Nominatim"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "{{ $('HubSpot Trigger').first().json.id }}",
+          "mode": "id"
+        },
+        "updateFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        -192
+      ],
+      "id": "8bd4d6fd-db89-486f-a846-c0906e82476a",
+      "name": "Update a deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        -128
+      ],
+      "id": "27d088e3-9725-413a-9bc1-28def9ea4dc6",
+      "name": "Merge - Coords résolues"
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('HubSpot Trigger').first().json;\n\nconst lat = trigger.properties.rdv_lat ||\n  $('HTTP Request - Nominatim').first().json[0]?.lat;\nconst lng = trigger.properties.rdv_lng ||\n  $('HTTP Request - Nominatim').first().json[0]?.lon;\n\nreturn [{\n  json: {\n    dealId: trigger.id,\n    rdv_lat: parseFloat(lat),\n    rdv_lng: parseFloat(lng),\n    rdv_adresse: trigger.properties.rdv_adresse,\n    rdv_date: trigger.properties.rdv_date,\n    duree_intervention: parseInt(trigger.properties.duree_intervention) || 60,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        -128
+      ],
+      "id": "2819edf5-da1a-4631-b0a5-7861758fd329",
+      "name": "Code - Normaliser deal"
+    },
+    {
+      "parameters": {
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"filterGroups\": [{\n    \"filters\": [\n      {\n        \"propertyName\": \"rdv_date\",\n        \"operator\": \"EQ\",\n        \"value\": \"{{ $json.rdv_date }}\"\n      },\n      {\n        \"propertyName\": \"rdv_lat\",\n        \"operator\": \"HAS_PROPERTY\"\n      }\n    ]\n  }],\n  \"properties\": [\n    \"rdv_lat\", \"rdv_lng\", \"rdv_date\",\n    \"technicien_assigne\", \"duree_intervention\"\n  ],\n  \"limit\": 100\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1520,
+        -128
+      ],
+      "id": "2deb69c1-9cc4-4026-97dd-f8a2e03cded1",
+      "name": "API HubSpot - Cherche deals date",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const deals = $input.first().json.results || [];\nconst current = $('Code - Normaliser deal').first().json;\n\nconst others = deals.filter(d => d.id !== current.dealId);\n\nconst tech1Jobs = others.filter(d => d.properties.technicien_assigne === 'tech1');\nconst tech2Jobs = others.filter(d => d.properties.technicien_assigne === 'tech2');\n\nconst assignTo = tech1Jobs.length <= tech2Jobs.length ? 'tech1' : 'tech2';\n\nconst existingJobs = others.filter(d => d.properties.technicien_assigne === assignTo);\n\nconst allJobs = [\n  ...existingJobs.map(d => ({\n    id: parseInt(d.id),\n    lat: parseFloat(d.properties.rdv_lat),\n    lng: parseFloat(d.properties.rdv_lng),\n    duree: parseInt(d.properties.duree_intervention) || 60,\n    dealId: d.id,\n  })),\n  {\n    id: parseInt(current.dealId),\n    lat: current.rdv_lat,\n    lng: current.rdv_lng,\n    duree: current.duree_intervention,\n    dealId: current.dealId,\n  }\n];\n\nreturn [{ json: { assignTo, allJobs, newDealId: current.dealId, rdv_date: current.rdv_date } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        -128
+      ],
+      "id": "dfb5b16f-1ba5-46a1-8670-aa5f01c6a6b3",
+      "name": "Code - Assigne technicien"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { assignTo, allJobs, newDealId, rdv_date } = $input.first().json;\n\n// À REMPLACER PAR LES COORDONNÉES GPS RÉELLES DE VOS TECHNICIENS (point de départ/retour de tournée)\nconst techHomes = {\n  tech1: { lng: 0.0000, lat: 0.0000 }, // YOUR_TECH1_HOME_COORDS\n  tech2: { lng: 0.0000, lat: 0.0000 }, // YOUR_TECH2_HOME_COORDS\n};\n\nconst home = techHomes[assignTo];\n\nconst payload = {\n  vehicles: [{\n    id: 1,\n    profile: 'car',\n    start: [home.lng, home.lat],\n    end:   [home.lng, home.lat],\n    time_window: [28800, 64800],\n  }],\n  jobs: allJobs.map(j => ({\n    id: j.id,\n    location: [j.lng, j.lat],\n    service: j.duree * 60,\n  })),\n};\n\nreturn [{ json: { payload, assignTo, allJobs, newDealId, rdv_date } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        -128
+      ],
+      "id": "307f85dc-ecb1-4987-9a6a-0b58143fcd86",
+      "name": "Code - Build Vroom Payload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://vroom:3000",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2144,
+        -128
+      ],
+      "id": "9c8ab2ad-3914-4370-bb6c-9b5f863d91b1",
+      "name": "API Vroom - Optimise route"
+    },
+    {
+      "parameters": {
+        "jsCode": "const vroomResponse = $input.first().json;\nconst { assignTo, allJobs, newDealId, rdv_date } = $('Code - Build Vroom Payload').first().json;\n\nfunction secondsToISO(seconds, dateStr) {\n  const base = new Date(dateStr);\n  base.setHours(0, 0, 0, 0);\n  base.setSeconds(base.getSeconds() + seconds);\n  return base.toISOString();\n}\n\nconst steps = vroomResponse.routes[0].steps.filter(s => s.type === 'job');\n\nconst updates = steps.map((step, index) => {\n  const job = allJobs.find(j => j.id === step.job);\n  return {\n    dealId: String(step.job),\n    ordre_tournee: index + 1,\n    eta_arrivee: secondsToISO(step.arrival, rdv_date),\n    technicien_assigne: assignTo,\n    duree_intervention: job?.duree || 60,\n  };\n});\n\nreturn updates.map(u => ({ json: u }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        -128
+      ],
+      "id": "f5daebaf-5ffb-4884-90c2-bb905f15cf08",
+      "name": "Code - Traite réponse Vroom"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.dealId }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "customPropertiesUi": {
+            "customPropertiesValues": [
+              {
+                "property": "technicien_assigne",
+                "value": "={{ $json.technicien_assigne }}"
+              },
+              {
+                "property": "ordre_tournee",
+                "value": "={{ $json.ordre_tournee }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        2560,
+        -128
+      ],
+      "id": "78742960-aff1-4599-ac1d-82f8e99e2762",
+      "name": "Update a deal1",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "={{ $json.technicien_assigne }}",
+          "mode": "id"
+        },
+        "start": "={{ $json.eta_arrivee }}",
+        "end": "={{ new Date(new Date($json.eta_arrivee).getTime() + $json.duree_intervention * 60000).toISOString() }}",
+        "additionalFields": {
+          "description": "=Deal ID : {{ $json.dealId }}",
+          "summary": "=Intervention #{{ $json.ordre_tournee }} — EMAFUITES"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2768,
+        -128
+      ],
+      "id": "9cb92ff7-0dd6-45e9-aff7-ce086b4451c2",
+      "name": "Create an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "0zVXfvLleXuQj2Pn",
+          "name": "Google Calendar account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Optimisation tournée": {
+      "main": [
+        [
+          {
+            "node": "Si - RDV complet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - RDV complet": {
+      "main": [
+        [
+          {
+            "node": "Si - Coords manquantes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Coords manquantes": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Nominatim",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge - Coords résolues",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Nominatim": {
+      "main": [
+        [
+          {
+            "node": "Update a deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a deal": {
+      "main": [
+        [
+          {
+            "node": "Merge - Coords résolues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge - Coords résolues": {
+      "main": [
+        [
+          {
+            "node": "Code - Normaliser deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Normaliser deal": {
+      "main": [
+        [
+          {
+            "node": "API HubSpot - Cherche deals date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API HubSpot - Cherche deals date": {
+      "main": [
+        [
+          {
+            "node": "Code - Assigne technicien",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Assigne technicien": {
+      "main": [
+        [
+          {
+            "node": "Code - Build Vroom Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Build Vroom Payload": {
+      "main": [
+        [
+          {
+            "node": "API Vroom - Optimise route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Vroom - Optimise route": {
+      "main": [
+        [
+          {
+            "node": "Code - Traite réponse Vroom",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Traite réponse Vroom": {
+      "main": [
+        [
+          {
+            "node": "Update a deal1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a deal1": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

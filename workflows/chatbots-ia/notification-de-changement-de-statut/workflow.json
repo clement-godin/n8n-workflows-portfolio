@@ -1,0 +1,100 @@
+{
+  "name": "NOTIFICATION DE CHANGEMENT DE STATUT",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "team": "90152404333",
+        "events": [
+          "taskStatusUpdated"
+        ],
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.clickUpTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "58c1bbe0-7610-4b66-9264-b346247a7fb5",
+      "name": "Trigger - ClickUp changement statut",
+      "webhookId": "12604014-9541-471d-9b65-71885891eed9",
+      "credentials": {
+        "clickUpApi": {
+          "id": "0lTKTU8yfGf6zxoe",
+          "name": "ClickUp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "id": "={{ $json.task_id }}"
+      },
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [224, 0],
+      "id": "0328eaa4-3cef-43dc-853e-d182afc2b06f",
+      "name": "ClickUp - Récupère tâche",
+      "credentials": {
+        "clickUpApi": {
+          "id": "0lTKTU8yfGf6zxoe",
+          "name": "ClickUp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=La tâche \"{{ $json.name }}\" vient d'être déplacée de {{ $('Trigger - ClickUp changement statut').item.json.history_items[0].before.status }} à  {{ $('Trigger - ClickUp changement statut').item.json.history_items[0].after.status }}",
+        "replyMarkup": "={{ $json.name }}",
+        "forceReply": {},
+        "replyKeyboardOptions": {},
+        "replyKeyboardRemove": {},
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [448, 0],
+      "id": "ef417c57-d96b-487a-8d38-f91ecfa4c3c6",
+      "name": "Telegram - Notification statut",
+      "webhookId": "d87f84fb-0629-41e0-81f5-9e57281e9f51",
+      "credentials": {
+        "telegramApi": {
+          "id": "QOeg5qJb6B6fLLB5",
+          "name": "planification_taches_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - ClickUp changement statut": {
+      "main": [
+        [
+          {
+            "node": "ClickUp - Récupère tâche",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ClickUp - Récupère tâche": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Notification statut",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["BOT TELEGRAM", "CHAT BOT"]
+}

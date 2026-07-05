@@ -1,0 +1,133 @@
+{
+  "name": "EMAFUITES - Moteur créneaux",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "YOUR_WEBHOOK_PATH",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, -192],
+      "id": "e6bb8e11-b69c-4167-b46c-c89fbf2a246b",
+      "name": "Webhook - Moteur créneaux",
+      "webhookId": "YOUR_WEBHOOK_PATH",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://nominatim.openstreetmap.org/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "User-Agent", "value": "EMAFUITES-n8n/1.0" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [448, -192],
+      "id": "b444c81b-7780-4a3e-b7a4-1279fd8038a9",
+      "name": "HTTP Request - Nominatim"
+    },
+    {
+      "parameters": {
+        "jsCode": "const geo = $input.first().json[0];\nconst prev = $('Code - Préparer dates').first().json;\n\nif (!geo) throw new Error('Adresse introuvable : ' + prev.adresse);\n\nreturn [{\n  json: {\n    ...prev,\n    lat: parseFloat(geo.lat),\n    lng: parseFloat(geo.lon),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, -192],
+      "id": "87b22e7a-bcbf-4e6b-849f-302b8becd467",
+      "name": "Code - Extraire coordonnées"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { lat, lng, duree, jours } = $('Code - Extraire coordonnées').first().json;\nconst allDeals = $input.first().json.results || [];\n\n// Coordonnées approximatives du point de départ (dépôt / domicile) de chaque technicien\nconst techHomes = {\n  tech1: { lat: 50.6, lng: 3.0 },\n  tech2: { lat: 50.5, lng: 3.0 },\n};\n\nconst MAX_JOBS_PAR_JOUR = 5;\n\n// Distance vol d'oiseau en km (approximation rapide)\nfunction distKm(lat1, lng1, lat2, lng2) {\n  const R = 6371;\n  const dLat = (lat2 - lat1) * Math.PI / 180;\n  const dLng = (lng2 - lng1) * Math.PI / 180;\n  const a = Math.sin(dLat/2)**2 +\n    Math.cos(lat1 * Math.PI/180) *\n    Math.cos(lat2 * Math.PI/180) *\n    Math.sin(dLng/2)**2;\n  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\n}\n\nconst scores = [];\n\nfor (const jour of jours) {\n  for (const [techId, home] of Object.entries(techHomes)) {\n\n    // Jobs déjà planifiés ce jour pour ce tech\n    const jobsDuJour = allDeals.filter(d =>\n      d.properties.rdv_date?.startsWith(jour) &&\n      d.properties.technicien_assigne === techId\n    );\n\n    if (jobsDuJour.length >= MAX_JOBS_PAR_JOUR) continue;\n\n    // Distance moyenne du nouveau job aux jobs existants\n    let distScore = 0;\n    if (jobsDuJour.length === 0) {\n      // Jour vide : distance depuis le domicile du tech\n      distScore = distKm(home.lat, home.lng, lat, lng);\n    } else {\n      // Distance moyenne aux jobs existants\n      const dists = jobsDuJour.map(j =>\n        distKm(\n          parseFloat(j.properties.rdv_lat),\n          parseFloat(j.properties.rdv_lng),\n          lat, lng\n        )\n      );\n      distScore = dists.reduce((a, b) => a + b, 0) / dists.length;\n    }\n\n    // Score final : distance (km) + pénalité charge (jobs existants × 5km équivalent)\n    const chargeScore = jobsDuJour.length * 5;\n    const totalScore = distScore + chargeScore;\n\n    scores.push({\n      jour,\n      techId,\n      nbJobsExistants: jobsDuJour.length,\n      distKm: Math.round(distScore * 10) / 10,\n      score: Math.round(totalScore * 10) / 10,\n    });\n  }\n}\n\n// Trier par score croissant, garder les 3 meilleurs\nconst top3 = scores\n  .sort((a, b) => a.score - b.score)\n  .slice(0, 3);\n\nreturn top3.map(s => ({ json: s }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, -192],
+      "id": "cf7e6705-9079-4ecc-ba99-5b43612d969f",
+      "name": "Code - Score créneaux"
+    },
+    {
+      "parameters": {
+        "jsCode": "const slots = $input.all().map(i => i.json);\nconst { adresse, lat, lng, duree } = $('Code - Extraire coordonnées').first().json;\n\nconst techLabels = {\n  tech1: 'Technicien 1',\n  tech2: 'Technicien 2',\n};\n\nconst formatted = slots.map((s, i) => {\n  const date = new Date(s.jour);\n  const label = date.toLocaleDateString('fr-FR', {\n    weekday: 'long', day: 'numeric', month: 'long'\n  });\n  return {\n    rang: i + 1,\n    jour: s.jour,\n    jour_label: label,\n    technicien: s.techId,\n    technicien_label: techLabels[s.techId],\n    interventions_existantes: s.nbJobsExistants,\n    distance_moyenne_km: s.distKm,\n  };\n});\n\nreturn [{\n  json: {\n    adresse,\n    lat,\n    lng,\n    duree,\n    slots: formatted,\n    // Pour Léa : phrase lisible\n    reponse_lea: formatted.map(s =>\n      `Option ${s.rang} : ${s.jour_label} avec le ${s.technicien_label} ` +\n      `(${s.interventions_existantes} intervention(s) déjà prévue(s) ce jour-là)`\n    ).join(' | ')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1344, -192],
+      "id": "9e109475-a204-4df6-a350-70a0468d025e",
+      "name": "Code - Formate réponse"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { adresse, duree, jours_a_scanner } = $input.first().json;\n\n// Générer les N prochains jours ouvrés\nconst jours = [];\nconst today = new Date();\n\nfor (let i = 1; jours.length < (jours_a_scanner || 14); i++) {\n  const d = new Date(today);\n  d.setDate(today.getDate() + i);\n  const dow = d.getDay();\n  if (dow !== 0 && dow !== 6) { // exclure week-ends\n    jours.push(d.toISOString().split('T')[0]); // YYYY-MM-DD\n  }\n}\n\nreturn [{ json: { adresse, duree: duree || 60, jours } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, -192],
+      "id": "a1e8ff05-b679-4cf9-8bf3-6ee432b02ed8",
+      "name": "Code - Préparer dates"
+    },
+    {
+      "parameters": {
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"filterGroups\": [{\n    \"filters\": [{\n      \"propertyName\": \"rdv_lat\",\n      \"operator\": \"HAS_PROPERTY\"\n    }]\n  }],\n  \"properties\": [\n    \"rdv_lat\", \"rdv_lng\", \"rdv_date\",\n    \"technicien_assigne\", \"duree_intervention\"\n  ],\n  \"limit\": 100\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [896, -192],
+      "id": "3de2da1f-f4b2-4678-a061-e01ff1606637",
+      "name": "API HubSpot - Cherche deals planifiés",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1552, -192],
+      "id": "db7a6741-d591-4be5-82c2-49c92b026154",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook - Moteur créneaux": { "main": [[{ "node": "Code - Préparer dates", "type": "main", "index": 0 }]] },
+    "HTTP Request - Nominatim": { "main": [[{ "node": "Code - Extraire coordonnées", "type": "main", "index": 0 }]] },
+    "Code - Extraire coordonnées": { "main": [[{ "node": "API HubSpot - Cherche deals planifiés", "type": "main", "index": 0 }]] },
+    "Code - Score créneaux": { "main": [[{ "node": "Code - Formate réponse", "type": "main", "index": 0 }]] },
+    "Code - Formate réponse": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] },
+    "Code - Préparer dates": { "main": [[{ "node": "HTTP Request - Nominatim", "type": "main", "index": 0 }]] },
+    "API HubSpot - Cherche deals planifiés": { "main": [[{ "node": "Code - Score créneaux", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "name": "DEMANDE D'AVIS GOOGLE AUTOMATIQUE",
+  "active": true,
+  "nodes": [
+    {
+      "id": "c0d8a149-b86a-4467-a58b-703df203c2ef",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 200],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            { "name": "prenom", "type": "string" },
+            { "name": "telephone", "type": "string" },
+            { "name": "email", "type": "string" },
+            { "name": "contactId", "type": "string" },
+            { "name": "dealId", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9905860a-f770-4ef8-b0fc-65a452f71033",
+      "name": "Code JS - Formate contact pour avis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 200],
+      "parameters": {
+        "jsCode": "\nconst d = $input.first().json;\nconst prenom    = d.prenom    || 'cher client';\nconst email     = d.email     || '';\nconst dealId    = d.dealId    || '';\nconst contactId = d.contactId || '';\n\nlet phone = d.telephone || '';\n// Already formatted from caller, but ensure E.164\nlet tel = phone.replace(/[\\s\\-\\.\\(\\)\\/]/g, '');\nif (tel.startsWith('0')) tel = '33' + tel.slice(1);\nif (tel && !tel.startsWith('+')) tel = '+' + tel;\n\nreturn [{json: { prenom, phone: tel, email, dealId, contactId, hasPhone: !!tel }}];\n"
+      }
+    },
+    {
+      "id": "c3e2e1ad-f0a1-4265-b332-e9417e77399a",
+      "name": "Si - A un téléphone ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [760, 200],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.hasPhone }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "8a36545c-5749-4ee9-b621-0ce813cf3499"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8d06bb38-c4ef-44a7-b47a-9e0cb52fcf9f",
+      "name": "API Meta - Demande avis WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1040, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_WHATSAPP_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.phone }}\",\n  \"type\": \"text\",\n  \"text\": {{\n    \"preview_url\": false,\n    \"body\": \"Bonjour {{ $json.prenom }} 👋 Merci de nous avoir fait confiance pour votre détection de fuite. Si notre intervention vous a satisfait, un avis Google nous aiderait beaucoup 🙏\\n👉 https://g.page/r/Ce4YqPOY2L2PEAE/review\\nMerci et bonne journée ! EMA Fuites\"\n  }}\n}}",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      }
+    },
+    {
+      "id": "797ea37d-b855-4423-8575-6bffd731d03a",
+      "name": "Gmail - Demande avis email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1040, 300],
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Merci pour votre confiance — Laissez-nous un avis Google 🙏",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nNous sommes ravis d'avoir pu intervenir pour vous. Votre avis compte énormément pour nous.<br><br>\n👉 <a href=\"https://g.page/r/Ce4YqPOY2L2PEAE/review\">Laisser un avis Google</a><br><br>\nMerci !<br>L'équipe EMA Fuites",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5KWmGq134q2eiYyC",
+          "name": "COMPTE GMAIL EMAFUITES"
+        }
+      },
+      "webhookId": "f91a6f62-c0d7-41ef-8f65-abf39e1cf99b"
+    },
+    {
+      "id": "915aac78-730e-45e6-8867-d9e0b4175bf4",
+      "name": "HubSpot - Marquer avis demandé",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1320, 200],
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v1/deals/{{ $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"properties\": [{\"name\": \"avis_demande\", \"value\": \"true\"}]}",
+        "options": {}
+      },
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [[{ "node": "Code JS - Formate contact pour avis", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Formate contact pour avis": {
+      "main": [[{ "node": "Si - A un téléphone ?", "type": "main", "index": 0 }]]
+    },
+    "Si - A un téléphone ?": {
+      "main": [
+        [{ "node": "API Meta - Demande avis WhatsApp", "type": "main", "index": 0 }],
+        [{ "node": "Gmail - Demande avis email", "type": "main", "index": 0 }]
+      ]
+    },
+    "API Meta - Demande avis WhatsApp": {
+      "main": [[{ "node": "HubSpot - Marquer avis demandé", "type": "main", "index": 0 }]]
+    },
+    "Gmail - Demande avis email": {
+      "main": [[{ "node": "HubSpot - Marquer avis demandé", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "saveManualExecutions": true
+  }
+}

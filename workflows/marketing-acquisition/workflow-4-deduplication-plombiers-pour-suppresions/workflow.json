@@ -1,0 +1,237 @@
+{
+  "name": "Workflow 4 — \"Déduplication Plombiers pour suppressions\"",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, -192],
+      "id": "0d07ab49-80f4-4ed3-b781-981095e3bbfb",
+      "name": "Trigger - Déduplique plombiers"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Récupérer companies et deals depuis les deux nœuds\nconst companies = $('HubSpot - Toutes companies').all();\nconst deals = $('HubSpot - Tous deals').all();\n\n// Construire index deals par companyId\nconst dealsByCompany = {};\nfor (const deal of deals) {\n  const companyIds = deal.json.associations?.associatedCompanyIds || [];\n  const dealId = deal.json.dealId?.toString();\n  for (const cid of companyIds) {\n    if (!dealsByCompany[cid]) dealsByCompany[cid] = [];\n    dealsByCompany[cid].push(dealId);\n  }\n}\n\n// Détecter doublons companies par téléphone\nconst seen = new Map();\nconst toDelete = []; // {company_id, deal_ids[]}\n\nfor (const item of companies) {\n  const phoneRaw = item.json.properties?.phone?.value || '';\n  const phone = phoneRaw.replace(/\\s/g, '');\n  const id = item.json.companyId?.toString();\n  const name = item.json.properties?.name?.value || '';\n\n  if (!phone) continue;\n\n  if (seen.has(phone)) {\n    const dealIds = dealsByCompany[id] || [];\n    toDelete.push({\n      json: {\n        company_id: id,\n        deal_ids: dealIds,\n        phone,\n        name\n      }\n    });\n  } else {\n    seen.set(phone, { id, name });\n  }\n}\n\nreturn toDelete.length > 0\n  ? toDelete\n  : [{ json: { message: 'Aucun doublon', total_companies: companies.length } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, -192],
+      "id": "18454c6e-10f0-441e-bad0-2539245adbe3",
+      "name": "Code JS - Détecte doublons"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "company",
+        "operation": "delete",
+        "companyId": {
+          "__rl": true,
+          "value": "={{ $('Code JS - Détecte doublons').item.json.company_id }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [1344, -192],
+      "id": "808d84ea-9893-4380-81d6-a9f5352521e5",
+      "name": "HubSpot - Supprime company doublon",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "delete",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.deal_ids[0] }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [1120, -192],
+      "id": "c0109bae-efeb-44d6-af42-c082a5882bdc",
+      "name": "HubSpot - Supprime deal doublon",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "company",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "propertiesCollection": {
+            "propertiesValues": {
+              "properties": [
+                "phone",
+                "name",
+                "domain"
+              ]
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [224, -192],
+      "id": "72030e8f-248b-487f-b9d8-c3033d85dd06",
+      "name": "HubSpot - Toutes companies",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "includeAssociations": true
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [448, -192],
+      "id": "3caf22cf-e975-4600-890c-661246086ead",
+      "name": "HubSpot - Tous deals",
+      "executeOnce": true,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "a1a21598-9371-44d4-b718-27de6f9a6e3c",
+              "leftValue": "={{ $json.deal_ids[0] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [896, -192],
+      "id": "01e4123b-67f2-4969-8708-4e9cf97185d5",
+      "name": "Si - Est doublon ?"
+    }
+  ],
+  "connections": {
+    "Trigger - Déduplique plombiers": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Toutes companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Détecte doublons": {
+      "main": [
+        [
+          {
+            "node": "Si - Est doublon ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Supprime company doublon": {
+      "main": [
+        []
+      ]
+    },
+    "HubSpot - Supprime deal doublon": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Supprime company doublon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Toutes companies": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Tous deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Tous deals": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Détecte doublons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Est doublon ?": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Supprime deal doublon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["MARKETING", "PROSPECTIONS"]
+}

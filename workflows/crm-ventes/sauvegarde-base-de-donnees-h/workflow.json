@@ -1,0 +1,136 @@
+{
+  "name": "sauvegarde base de données /H",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -16
+      ],
+      "id": "e89017ae-31f3-4ab9-a864-9cea4dd959cb",
+      "name": "Trigger - Sauvegarde BDD toutes les heures"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "stdout",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        -16
+      ],
+      "id": "290ed8d7-366e-4ad3-8215-945eeb2cff0c",
+      "name": "Prépare - Convertit stdout en fichier"
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "docker exec -e PGPASSWORD=\"YOUR_DB_PASSWORD\" metabase-ckqd-postgres-1 pg_dump -U metabase_admin emafuites_data"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        208,
+        -16
+      ],
+      "id": "98acc88f-36ad-4c69-901c-425bddf9c5b4",
+      "name": "SSH - Dump base de données",
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "bt56RSR5H3bzgKsg",
+          "name": "SSH Private Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "=data",
+        "name": "=sauvegarde_emafuites_{{ $now.format('dd-MM-yyyy_HH-mm') }}.sql",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+          "mode": "list",
+          "cachedResultName": "BACK UP DATABASE META BASE",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_DRIVE_FOLDER_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        752,
+        -16
+      ],
+      "id": "846f9667-b8c9-4582-bbcb-ae62a334b8fb",
+      "name": "Drive - Upload sauvegarde BDD",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Sauvegarde BDD toutes les heures": {
+      "main": [
+        [
+          {
+            "node": "SSH - Dump base de données",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prépare - Convertit stdout en fichier": {
+      "main": [
+        [
+          {
+            "node": "Drive - Upload sauvegarde BDD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - Dump base de données": {
+      "main": [
+        [
+          {
+            "node": "Prépare - Convertit stdout en fichier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "name": "AJOUT DES APPELS TWILLO SUR HUBSPOT",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "f3961f74-1664-460e-a361-ce696b85b4cc",
+      "name": "Trigger - Appels Twilio manuels"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "engagement",
+        "type": "call",
+        "metadata": {
+          "durationMilliseconds": 30000,
+          "fromNumber": "+33600000000",
+          "status": "COMPLETED",
+          "toNumber": "+33600000000"
+        },
+        "additionalFields": {
+          "associations": {
+            "contactIds": "={{ $json.vid }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [416, 0],
+      "id": "eb2620f9-6737-412d-9552-476f65dfc41c",
+      "name": "HubSpot - Crée engagement appel",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "operation": "get",
+        "contactId": {
+          "__rl": true,
+          "value": 462465092327,
+          "mode": "list",
+          "cachedResultName": "your-email@domain.com"
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [208, 0],
+      "id": "1ddda5f9-6933-41e2-b0fa-d13156f37d39",
+      "name": "HubSpot - Récupère contact",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Appels Twilio manuels": {
+      "main": [[{ "node": "HubSpot - Récupère contact", "type": "main", "index": 0 }]]
+    },
+    "HubSpot - Récupère contact": {
+      "main": [[{ "node": "HubSpot - Crée engagement appel", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

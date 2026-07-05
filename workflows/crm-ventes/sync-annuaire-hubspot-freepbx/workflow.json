@@ -1,0 +1,91 @@
+{
+  "name": "Sync Annuaire HubSpot → FreePBX",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "operation": "getAll",
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "name": "HubSpot - Récupère tous contacts",
+      "type": "n8n-nodes-base.hubspot",
+      "position": [224, 0],
+      "id": "dd853992-14c6-48dc-a54a-503790551ad0",
+      "typeVersion": 2.2,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const contacts = $input.all();\n\nlet entries = '';\n\n// Fonction utilitaire : normalisation téléphone\nconst normalizePhone = (phone) => {\n  let tel = (phone || '').replace(/[^0-9+]/g, '');\n\n  if (tel.startsWith('+33')) {\n    tel = '0' + tel.slice(3);\n  }\n\n  return tel;\n};\n\n// Génération des contacts\nfor (const item of contacts) {\n  const c = item.json.properties || item.json;\n\n  const firstname = c.firstname || '';\n  const lastname  = c.lastname || '';\n  const company   = c.company || '';\n  const phone     = c.phone || c.mobilephone || '';\n\n  if (!phone) continue; // ignorer si pas de numéro\n\n  // Nom affiché : Prénom Nom (Société)\n  let name = `${firstname} ${lastname}`.trim();\n\n  if (company) {\n    name += ` (${company})`;\n  }\n\n  name = name.substring(0, 50); // limite Yealink\n\n  const tel = normalizePhone(phone);\n\n  if (!tel) continue;\n\n  entries +=\n    `  <DirectoryEntry>\\n` +\n    `    <Name>${name}</Name>\\n` +\n    `    <Telephone>${tel}</Telephone>\\n` +\n    `  </DirectoryEntry>\\n`;\n}\n\n// Postes internes\nconst internes = [\n  { name: 'Assistante', tel: '100' },\n  { name: 'Tech 1', tel: '101' },\n  { name: 'Tech 2', tel: '102' },\n  { name: 'Direction', tel: '103' },\n  { name: 'Conférence', tel: '500' },\n];\n\nfor (const { name, tel } of internes) {\n  entries +=\n    `  <DirectoryEntry>\\n` +\n    `    <Name>${name}</Name>\\n` +\n    `    <Telephone>${tel}</Telephone>\\n` +\n    `  </DirectoryEntry>\\n`;\n}\n\n// XML final\nconst xml =\n  `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\n` +\n  `<YealinkIPPhoneDirectory>\\n` +\n  `${entries}` +\n  `</YealinkIPPhoneDirectory>`;\n\n// Résultat\nreturn [\n  {\n    json: {\n      xml,\n      count: contacts.length,\n    },\n  },\n];"
+      },
+      "name": "Code JS - Génère XML annuaire",
+      "type": "n8n-nodes-base.code",
+      "position": [448, 0],
+      "id": "b646937b-f3a2-4c58-9429-79fa07437732",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst count = $input.first().json.count || 0;\n\n// Log propre\nconsole.log(`Annuaire synchronisé : ${count} contacts`);\n\n// Retour des données inchangé\nreturn items;"
+      },
+      "name": "Code JS - Log résultat",
+      "type": "n8n-nodes-base.code",
+      "position": [864, 0],
+      "id": "bbb786a2-3a28-451a-83eb-d225f62b27c3",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours" }]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0],
+      "id": "6bc6a3a3-1540-438f-93c6-bed46b4b709b",
+      "name": "Trigger - Sync annuaire FreePBX"
+    },
+    {
+      "parameters": {
+        "mode": "jsonToxml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [656, 0],
+      "id": "d5c5b8c5-098c-4099-8bcc-cd9d5ea653fa",
+      "name": "Prépare - Convertit JSON vers XML"
+    }
+  ],
+  "connections": {
+    "HubSpot - Récupère tous contacts": {
+      "main": [[{ "node": "Code JS - Génère XML annuaire", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Génère XML annuaire": {
+      "main": [[{ "node": "Prépare - Convertit JSON vers XML", "type": "main", "index": 0 }]]
+    },
+    "Trigger - Sync annuaire FreePBX": {
+      "main": [[{ "node": "HubSpot - Récupère tous contacts", "type": "main", "index": 0 }]]
+    },
+    "Prépare - Convertit JSON vers XML": {
+      "main": [[{ "node": "Code JS - Log résultat", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["HUBSPOT", "CRM & VENTES"]
+}

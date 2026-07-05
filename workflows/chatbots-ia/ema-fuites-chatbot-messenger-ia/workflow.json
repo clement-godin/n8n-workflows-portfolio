@@ -1,0 +1,463 @@
+{
+  "name": "EMA Fuites - Chatbot Messenger IA",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "messenger-ema",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-2464, 336],
+      "id": "2f7a33cd-4650-477c-a7aa-fb5726bcdd47",
+      "name": "Webhook - Reçoit messages Messenger",
+      "webhookId": "messenger-ema-chatbot"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\n// Vérifie que c'est bien un événement Messenger\nif (!body || body.object !== 'page') {\n  return [{ json: { valid: false, reason: 'not_messenger' } }];\n}\n\nconst entry = body.entry && body.entry[0];\nif (!entry) return [{ json: { valid: false, reason: 'no_entry' } }];\n\n// Messaging\nconst messaging = entry.messaging && entry.messaging[0];\nif (!messaging) return [{ json: { valid: false, reason: 'no_messaging' } }];\n\n// Ignore les echo (messages envoyés par le bot)\nif (messaging.message && messaging.message.is_echo) {\n  return [{ json: { valid: false, reason: 'echo' } }];\n}\n\n// Ignore les deliveries et reads\nif (messaging.delivery || messaging.read) {\n  return [{ json: { valid: false, reason: 'delivery_or_read' } }];\n}\n\n// Vérifie qu'il y a un message texte\nif (!messaging.message || !messaging.message.text) {\n  return [{ json: {\n    valid: true,\n    non_text: true,\n    sender_id: messaging.sender.id,\n    page_id:   entry.id\n  }}];\n}\n\nreturn [{ json: {\n  valid:      true,\n  non_text:   false,\n  sender_id:  messaging.sender.id,\n  page_id:    entry.id,\n  message_id: messaging.message.mid,\n  message_text: messaging.message.text,\n  timestamp:  messaging.timestamp\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2240, 336],
+      "id": "3e9b5f26-4ce7-4796-ab49-9cc4c3a85ffa",
+      "name": "Code JS - Parse message Messenger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-2016, 336],
+      "id": "dd858e6c-bc52-42fa-a15d-2b5a5ca4ff33",
+      "name": "Si - Message valide ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.conversations) staticData.conversations = {};\n\nconst senderId  = $json.sender_id;\nconst nonText   = $json.non_text || false;\nconst messageText = $json.message_text || '';\nconst msgLower  = messageText.toLowerCase();\n\nconst conv = staticData.conversations[senderId] || {\n  step:    'initial',\n  history: [],\n  nom:     'Client',\n  telephone: ''\n};\n\n// Détecte demande handover humain\nconst HANDOVER_KEYWORDS = [\n  'humain', 'personne', 'conseiller', 'rappel', 'rappelle',\n  'parler', 'quelquun', 'agent', 'technicien', 'urgent', 'sos'\n];\nconst demandeHandover = HANDOVER_KEYWORDS.some(k => msgLower.includes(k)) && conv.step !== 'handover';\n\n// Handover actif — stop IA\nif (conv.step === 'handover') {\n  staticData.conversations[senderId] = conv;\n  return [{ json: {\n    sender_id: senderId,\n    page_id:   $json.page_id,\n    is_handover: true,\n    skip_ia:   true,\n    conv\n  }}];\n}\n\n// Non-texte\nif (nonText) {\n  return [{ json: {\n    sender_id: senderId,\n    page_id:   $json.page_id,\n    is_handover: false,\n    skip_ia:   true,\n    is_non_text: true,\n    response:  'Je traite uniquement les messages texte. Décrivez votre problème en quelques mots 😊',\n    conv\n  }}];\n}\n\n// Ajoute à l'historique\nconst history = conv.history || [];\nhistory.push({ role: 'user', content: messageText });\nstaticData.conversations[senderId] = { ...conv, history };\n\nreturn [{ json: {\n  sender_id: senderId,\n  page_id:   $json.page_id,\n  messageText,\n  is_handover:    false,\n  skip_ia:        false,\n  is_non_text:    false,\n  demandeHandover,\n  conv: staticData.conversations[senderId]\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1792, 256],
+      "id": "b6691d15-d88e-4def-9b98-7feffa85f256",
+      "name": "Code JS - Charge état conversation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-skip",
+              "leftValue": "={{ $json.skip_ia }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-1568, 256],
+      "id": "a616419e-80f5-4e4a-9bb6-01afe2fff615",
+      "name": "Si - Skip IA ?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-handover",
+              "leftValue": "={{ $json.is_handover }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-1344, 416],
+      "id": "e5d703ea-819c-47e2-92b4-94f3c5b92bef",
+      "name": "Si - Handover actif ou non-texte ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst conv = d.conv;\n\nconst VILLES_COUVERTES = [\n  'lille', 'roubaix', 'tourcoing', 'villeneuve', 'marcq', 'wasquehal',\n  'croix', 'hem', 'wattrelos', 'mouvaux', 'loos', 'seclin', 'lesquin',\n  'wambrechies', 'lambersart', 'lens', 'lievin', 'henin', 'bethune',\n  'bruay', 'noeux', 'dunkerque', 'arras', 'douai', 'valenciennes',\n  'maubeuge', 'calais', 'boulogne', 'saint-omer', 'hazebrouck', 'armentieres'\n];\n\nconst systemPrompt = `Tu es l'assistant virtuel d'EMA Fuites, spécialiste en détection de fuites non destructive dans les Hauts-de-France.\n\nTon objectif : qualifier les leads en collectant 3 informations :\n1. TYPE DE FUITE (fuite visible, fuite suspectée/humidité, compteur anormal, autre)\n2. VILLE (doit être dans les Hauts-de-France)\n3. URGENCE (urgent/cette semaine/pas urgent)\n\nVILLES COUVERTES : ${VILLES_COUVERTES.join(', ')} et environs.\n\nÉTAT ACTUEL DE LA CONVERSATION :\n- type_fuite : ${conv.type_fuite || 'non renseigné'}\n- ville : ${conv.ville || 'non renseigné'}\n- urgence : ${conv.urgence || 'non renseigné'}\n\nRÈGLES :\n- Réponds en français, de façon chaleureuse et professionnelle\n- Pose UNE SEULE question à la fois\n- Si la ville n'est pas dans la zone couverte, explique poliment et termine\n- Si toutes les infos sont collectées, confirme et dis qu'un technicien va rappeler\n- Si la question est trop technique ou hors sujet, propose un rappel humain\n- Maximum 3 phrases par réponse\n- Ne mentionne jamais de prix\n\nRéponds UNIQUEMENT en JSON valide :\n{\n  \"message\": \"ta réponse au client\",\n  \"type_fuite\": \"valeur extraite ou null\",\n  \"ville\": \"valeur extraite ou null\",\n  \"urgence\": \"valeur extraite ou null\",\n  \"qualified\": true/false,\n  \"hors_zone\": true/false,\n  \"besoin_humain\": true/false\n}`;\n\nconst messages = [\n  { role: 'system', content: systemPrompt },\n  ...(conv.history || []).slice(-6)\n];\n\nreturn [{ json: {\n  ...d,\n  requestBody: JSON.stringify({\n    model: 'deepseek-chat',\n    temperature: 0.3,\n    max_tokens: 400,\n    messages\n  })\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1344, 176],
+      "id": "824126ae-6a9e-48e4-b015-a31674d8abe8",
+      "name": "Code JS - Prépare prompt DeepSeek"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-1120, 176],
+      "id": "644c59e0-6cc1-4b97-83c7-856bb2a81a21",
+      "name": "API DeepSeek - Analyse et répond",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "MBt6ozX97KVIAwcD",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content\n  .trim()\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/i, '')\n  .replace(/```\\s*$/i, '');\n\nconst prev = $('Code JS - Prépare prompt DeepSeek').first().json;\nconst conv = prev.conv;\n\nlet ia;\ntry {\n  ia = JSON.parse(raw);\n} catch(e) {\n  ia = {\n    message: \"Je n'ai pas bien compris. Pouvez-vous reformuler ? 😊\",\n    type_fuite: null, ville: null, urgence: null,\n    qualified: false, hors_zone: false, besoin_humain: false\n  };\n}\n\nconst updatedConv = {\n  ...conv,\n  type_fuite: ia.type_fuite || conv.type_fuite || null,\n  ville:      ia.ville      || conv.ville      || null,\n  urgence:    ia.urgence    || conv.urgence    || null\n};\n\nif (!updatedConv.history) updatedConv.history = [];\nupdatedConv.history.push({ role: 'assistant', content: ia.message });\n\nlet newStep = conv.step || 'initial';\nif (ia.hors_zone || prev.demandeHandover) newStep = 'handover';\nelse if (ia.qualified)                    newStep = 'done';\nelse                                       newStep = 'en_cours';\n\nupdatedConv.step = newStep;\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.conversations) staticData.conversations = {};\nstaticData.conversations[prev.sender_id] = updatedConv;\n\nreturn [{ json: {\n  sender_id:    prev.sender_id,\n  page_id:      prev.page_id,\n  response:     ia.message,\n  qualified:    ia.qualified || false,\n  hors_zone:    ia.hors_zone || false,\n  besoin_humain: ia.besoin_humain || prev.demandeHandover || false,\n  step:         newStep,\n  leadData:     updatedConv\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-896, 176],
+      "id": "6575e728-ddc5-4ab8-b0de-832570793256",
+      "name": "Code JS - Parse réponse DeepSeek"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/me/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "YOUR_META_PAGE_ACCESS_TOKEN"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"recipient\": { \"id\": \"{{ $json.sender_id }}\" },\n  \"message\":   { \"text\": {{ JSON.stringify($json.response) }} }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-672, 176],
+      "id": "8171f8e4-8370-4c69-96fc-9b7980dfa979",
+      "name": "API Meta - Envoie réponse Messenger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-humain",
+              "leftValue": "={{ $json.besoin_humain }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-448, 176],
+      "id": "2576d730-c00e-439b-ac85-6d45f70c4cb3",
+      "name": "Si - Handover humain ?"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🙋 <b>Handover Messenger — EMA Fuites</b>\n\n👤 <b>{{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.nom }}</b>\n🆔 Messenger ID : {{ $('Code JS - Parse réponse DeepSeek').item.json.sender_id }}\n\n💬 Le client demande à parler à un humain ou a une question complexe.\n\n📋 Ce qui a été collecté :\n• Problème : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.type_fuite || 'non renseigné' }}\n• Ville : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.ville || 'non renseigné' }}\n• Urgence : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.urgence || 'non renseigné' }}\n\n👉 <b>Réponds directement sur Messenger depuis ta page Facebook EMA Fuites</b>\nLe bot est mis en pause pour cette conversation.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-224, 256],
+      "id": "9f0339f4-b4d4-45db-ac87-8b03bf88cbb0",
+      "name": "Telegram - Alerte handover",
+      "webhookId": "9e5e8d2c-3693-434a-ac5e-d42727a929a9",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-qualified",
+              "leftValue": "={{ $('Code JS - Parse réponse DeepSeek').item.json.qualified }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-224, 80],
+      "id": "2cc79c97-43c8-453c-b1b5-7d85ab44e209",
+      "name": "Si - Lead qualifié ?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_SPREADSHEET_ID_EMA_FUITES",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "leads_messenger",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('dd/MM/yyyy') }}",
+            "Heure": "={{ $now.toFormat('HH:mm') }}",
+            "Nom": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.nom }}",
+            "Sender_ID": "={{ $('Code JS - Parse réponse DeepSeek').item.json.sender_id }}",
+            "Type_fuite": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.type_fuite }}",
+            "Ville": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.ville }}",
+            "Urgence": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.urgence }}",
+            "Source": "Messenger",
+            "Statut": "Nouveau"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Date", "displayName": "Date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Heure", "displayName": "Heure", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Nom", "displayName": "Nom", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Sender_ID", "displayName": "Sender_ID", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Type_fuite", "displayName": "Type_fuite", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Ville", "displayName": "Ville", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Urgence", "displayName": "Urgence", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Source", "displayName": "Source", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Statut", "displayName": "Statut", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [0, 0],
+      "id": "f2751bed-7297-42aa-8108-9fe42ff392e8",
+      "name": "Google Sheets - Sauvegarde lead",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔔 <b>Nouveau lead Messenger — EMA Fuites</b>\n\n👤 <b>{{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.nom }}</b>\n🆔 {{ $('Code JS - Parse réponse DeepSeek').item.json.sender_id }}\n\n📋 Problème : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.type_fuite }}\n📍 Ville : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.ville }}\n⏱️ Urgence : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.urgence }}\n\n🕐 {{ $now.toFormat('dd/MM/yyyy') }} à {{ $now.toFormat('HH:mm') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [224, 0],
+      "id": "6399b3b7-66cd-4fb4-ad40-43baba1bb5b1",
+      "name": "Telegram - Notif nouveau lead",
+      "webhookId": "2aa77001-6380-4323-9945-960184323bd1",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/me/messages",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "YOUR_META_PAGE_ACCESS_TOKEN"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"recipient\": { \"id\": \"{{ $json.sender_id }}\" },\n  \"message\":   { \"text\": {{ JSON.stringify($json.response) }} }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-1120, 416],
+      "id": "e68a98ae-e9f6-4896-bceb-f3635ae555ca",
+      "name": "API Meta - Envoie réponse non-texte"
+    }
+  ],
+  "connections": {
+    "Webhook - Reçoit messages Messenger": {
+      "main": [[{ "node": "Code JS - Parse message Messenger", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Parse message Messenger": {
+      "main": [[{ "node": "Si - Message valide ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Message valide ?": {
+      "main": [[{ "node": "Code JS - Charge état conversation", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Charge état conversation": {
+      "main": [[{ "node": "Si - Skip IA ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Skip IA ?": {
+      "main": [
+        [{ "node": "Si - Handover actif ou non-texte ?", "type": "main", "index": 0 }],
+        [{ "node": "Code JS - Prépare prompt DeepSeek", "type": "main", "index": 0 }]
+      ]
+    },
+    "Si - Handover actif ou non-texte ?": {
+      "main": [
+        [],
+        [{ "node": "API Meta - Envoie réponse non-texte", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code JS - Prépare prompt DeepSeek": {
+      "main": [[{ "node": "API DeepSeek - Analyse et répond", "type": "main", "index": 0 }]]
+    },
+    "API DeepSeek - Analyse et répond": {
+      "main": [[{ "node": "Code JS - Parse réponse DeepSeek", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Parse réponse DeepSeek": {
+      "main": [[{ "node": "API Meta - Envoie réponse Messenger", "type": "main", "index": 0 }]]
+    },
+    "API Meta - Envoie réponse Messenger": {
+      "main": [[{ "node": "Si - Handover humain ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Handover humain ?": {
+      "main": [
+        [{ "node": "Telegram - Alerte handover", "type": "main", "index": 0 }],
+        [{ "node": "Si - Lead qualifié ?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Si - Lead qualifié ?": {
+      "main": [[{ "node": "Google Sheets - Sauvegarde lead", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets - Sauvegarde lead": {
+      "main": [[{ "node": "Telegram - Notif nouveau lead", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

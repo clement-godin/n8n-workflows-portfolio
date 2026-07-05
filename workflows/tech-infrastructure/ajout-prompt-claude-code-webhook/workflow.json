@@ -1,0 +1,190 @@
+{
+  "name": "AJOUT PROMPT CLAUDE CODE (WEBHOOK)",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ajout-prompt-claude-code",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-01",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "43ba26cb-9ed4-409d-890a-ab2386a889a9",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ozUO37ePricPT6ET",
+          "name": "Webhook Ajout Prompt Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\nconst required = ['titre', 'repertoire_projet', 'prompt'];\nfor (const field of required) {\n  if (!body[field] || String(body[field]).trim() === '') {\n    return [{ json: { __error: true, message: `Champ requis manquant : ${field}` } }];\n  }\n}\n\nconst modeles = ['sonnet', 'opus', 'haiku'];\nlet modele = String(body.modele || '').toLowerCase().trim();\nif (!modeles.includes(modele)) modele = 'sonnet';\n\nconst priorites = ['haute', 'moyenne', 'basse'];\nlet priorite = String(body.priorite || '').toLowerCase().trim();\nif (!priorites.includes(priorite)) priorite = 'moyenne';\n\nconst slugify = (str) => str\n  .normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .toLowerCase()\n  .replace(/[^a-z0-9\\s-]/g, '')\n  .trim()\n  .replace(/\\s+/g, '-')\n  .substring(0, 40);\n\nconst now = new Date();\nconst ts = now.toISOString().replace(/[-:T.Z]/g, '').substring(0, 14);\nconst id = `${slugify(body.titre)}-${ts}`;\n\nconst dd = String(now.getDate()).padStart(2, '0');\nconst mm = String(now.getMonth() + 1).padStart(2, '0');\nconst yyyy = now.getFullYear();\nconst date_creation = `${dd}/${mm}/${yyyy}`;\n\nreturn [{\n  json: {\n    __error: false,\n    id,\n    titre: String(body.titre).trim(),\n    repertoire_projet: String(body.repertoire_projet).trim(),\n    prompt: String(body.prompt).trim(),\n    modele,\n    priorite,\n    statut: 'à faire',\n    date_creation,\n    date_lancement: '',\n    date_fin: '',\n    resume: '',\n    erreur: ''\n  }\n}];"
+      },
+      "id": "code-valid",
+      "name": "Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "looseTypeValidation": false
+          },
+          "conditions": [
+            {
+              "id": "err-check",
+              "leftValue": "={{ $json.__error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "Valide ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [464, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 0,
+          "cachedResultName": "claude_code_prompts"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "titre": "={{ $json.titre }}",
+            "repertoire_projet": "={{ $json.repertoire_projet }}",
+            "statut": "={{ $json.statut }}",
+            "priorite": "={{ $json.priorite }}",
+            "date_creation": "={{ $json.date_creation }}",
+            "date_lancement": "={{ $json.date_lancement }}",
+            "date_fin": "={{ $json.date_fin }}",
+            "resume": "={{ $json.resume }}",
+            "erreur": "={{ $json.erreur }}",
+            "prompt": "={{ $json.prompt }}",
+            "modele": "={{ $json.modele }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "gs-append",
+      "name": "Ajoute ligne",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [704, -128],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ `✅ Prompt ajouté à la file\\n📝 ${$json.titre}\\n📁 ${$json.repertoire_projet}\\n🤖 Modèle : ${$json.modele}\\n🔢 Priorité : ${$json.priorite}\\n⏰ Sera lancé au prochain passage (0h15)` }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "tg-01",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [944, -128],
+      "webhookId": "ab477047-549b-4153-aada-1293e2243909",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ statut: 'ajouté', id: $('Validation').item.json.id, titre: $('Validation').item.json.titre }) }}",
+        "options": {}
+      },
+      "id": "resp-200",
+      "name": "Réponse 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1184, -128]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ statut: 'erreur', message: $json.message }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "resp-400",
+      "name": "Réponse 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [704, 128]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Validation", "type": "main", "index": 0 }]]
+    },
+    "Validation": {
+      "main": [[{ "node": "Valide ?", "type": "main", "index": 0 }]]
+    },
+    "Valide ?": {
+      "main": [
+        [{ "node": "Réponse 400", "type": "main", "index": 0 }],
+        [{ "node": "Ajoute ligne", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ajoute ligne": {
+      "main": [[{ "node": "Telegram", "type": "main", "index": 0 }]]
+    },
+    "Telegram": {
+      "main": [[{ "node": "Réponse 200", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Paris",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  },
+  "tags": ["TECH & INFRA", "WEBHOOK SITE WEB"]
+}

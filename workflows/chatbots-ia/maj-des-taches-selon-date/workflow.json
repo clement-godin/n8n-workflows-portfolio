@@ -1,0 +1,83 @@
+{
+  "name": "MAJ DES TACHES SELON DATE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtMinute": 3
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0],
+      "id": "28e083e8-6f35-4570-9601-7e2d4987966d",
+      "name": "Trigger - MAJ tâches selon date"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "team": "90152404333",
+        "space": "901510196689",
+        "folder": "901515575833",
+        "list": "901522744043",
+        "filters": {
+          "dueDateGt": "={{ DateTime.now().setZone('Europe/Paris').startOf('day').plus({ minutes: 1 }).toMillis() }}",
+          "dueDateLt": "={{ DateTime.now().setZone('Europe/Paris').set({ hour: 23, minute: 29, second: 0, millisecond: 0 }).toMillis() }}",
+          "statuses": ["planifier", "in progress", "prevue demain"]
+        }
+      },
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [208, 0],
+      "id": "2624161f-29c8-4b47-9131-4b17ce62317d",
+      "name": "ClickUp - Récupère tâches du jour",
+      "credentials": {
+        "clickUpApi": {
+          "id": "0lTKTU8yfGf6zxoe",
+          "name": "ClickUp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "id": "={{ $json.id }}",
+        "updateFields": {
+          "status": "prevue auj"
+        }
+      },
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [416, 0],
+      "id": "5cbe482d-317a-42fe-8009-8f402bf66b25",
+      "name": "ClickUp - Met à jour statut tâche",
+      "credentials": {
+        "clickUpApi": {
+          "id": "0lTKTU8yfGf6zxoe",
+          "name": "ClickUp account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - MAJ tâches selon date": {
+      "main": [[{ "node": "ClickUp - Récupère tâches du jour", "type": "main", "index": 0 }]]
+    },
+    "ClickUp - Récupère tâches du jour": {
+      "main": [[{ "node": "ClickUp - Met à jour statut tâche", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

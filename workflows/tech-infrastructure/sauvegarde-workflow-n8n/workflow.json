@@ -1,0 +1,3137 @@
+{
+  "name": "SAUVEGARDE WORKFLOW N8N",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -4640,
+        2976
+      ],
+      "id": "da1e20c5-5a66-49d9-bb36-8ba217e693ff",
+      "name": "Cron - Toutes les heures"
+    },
+    {
+      "parameters": {
+        "filters": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        -3968,
+        2976
+      ],
+      "id": "0880bed8-1ba6-4e67-8e1a-750bffb5e25f",
+      "name": "n8n API - Récupère tous les workflows",
+      "credentials": {
+        "n8nApi": {
+          "id": "LuFO2lPkS3PFcSxw",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.isArchived }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3744,
+        2976
+      ],
+      "id": "56e0429e-9b16-4e9f-ba14-5654a9fc5fc8",
+      "name": "Si - Workflow archivé ?"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "workflowId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        -3520,
+        3168
+      ],
+      "id": "e4d6fc6d-8dbd-457c-8563-c791115a7d13",
+      "name": "n8n API - Supprime workflow archivé",
+      "credentials": {
+        "n8nApi": {
+          "id": "LuFO2lPkS3PFcSxw",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "var all = $input.all();\nvar nc = [];\nall.forEach(function(item) {\n  var w = item.json;\n  var hasError = w.settings && w.settings.errorWorkflow && w.settings.errorWorkflow.trim() !== '';\n  if (!hasError && w.active) nc.push({ name: w.name || 'Sans nom', id: w.id || '' });\n});\nvar message = nc.length === 0\n  ? '✅ <b>Tous les workflows actifs ont une notification d\\'erreur configurée</b>'\n  : '⚠️ <b>' + nc.length + ' workflow(s) sans notification d\\'erreur :</b>\\n\\n' + nc.map(function(w){ return '• ' + w.name; }).join('\\n') + '\\n\\n💡 Ajoute un <i>Error Workflow</i> dans leurs Settings.';\nreturn [{ json: { message } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3520,
+        2784
+      ],
+      "id": "e6b59159-5e7d-424d-81b5-af0edabf69ce",
+      "name": "Code JS - Vérifie config notif erreurs"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -3296,
+        2784
+      ],
+      "id": "82bfe665-d45c-498f-8e4c-92b20667cf9b",
+      "name": "Telegram - Rapport notif erreurs",
+      "webhookId": "3a1bb79e-d160-4c0d-a9d4-c1e3dd0c8e03",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -3520,
+        2976
+      ],
+      "id": "83071b20-f87b-4aeb-90eb-1e0350b6f796",
+      "name": "Convertit workflow en fichier JSON"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -3296,
+        2976
+      ],
+      "id": "7a2b0a9d-010f-46b6-82fe-b37801989c5a",
+      "name": "SplitInBatches - Boucle principale workflows"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=✅ {{ $('n8n API - Récupère tous les workflows').all().length }} workflows sauvegardés",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -3072,
+        2496
+      ],
+      "id": "2f292cbc-5408-468c-a2a1-838022f6bce4",
+      "name": "Telegram - Backup terminé",
+      "webhookId": "1b29fd76-7bd2-41c1-905f-c72b0ddee9f7",
+      "executeOnce": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.tag1 }}",
+        "filter": {
+          "driveId": {
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "YOUR_GOOGLE_DRIVE_BACKUP_FOLDER_ID",
+            "mode": "list",
+            "cachedResultName": "BACK UP N8N"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2624,
+        1128
+      ],
+      "id": "11e78928-9d10-48a5-adf7-f5ed629f4cfe",
+      "name": "Google Drive - Cherche dossier tag1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c-tags",
+              "leftValue": "=workflows').item.json.tags[1]$('Code JS - Normalise tags').item.json.hasTag2",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2400,
+        1128
+      ],
+      "id": "f791b990-d656-49ad-8ff0-ea6c49e776df",
+      "name": "Si - 1 tag ou 2 tags ?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c-t1",
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2176,
+        1800
+      ],
+      "id": "a52c3c13-9657-44a8-9b12-927d7303b71a",
+      "name": "Si - Dossier tag1 trouvé ? (1 tag)"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=⚠️ Dossier tag1 manquant pour {{ $('n8n API - Récupère tous les workflows').item.json.name }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1952,
+        2400
+      ],
+      "id": "90beee3a-d80d-4d8f-81d8-20a1fd24d563",
+      "name": "Telegram - Erreur dossier manquant (1 tag)",
+      "webhookId": "0ce725b8-1a2d-4804-8e7f-b4cb6d5dec17",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $('n8n API - Récupère tous les workflows').item.json.name.replace(/['\\/:]/g, '_') }}",
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Google Drive - Cherche dossier tag1').item.json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1952,
+        1728
+      ],
+      "id": "e7602074-4315-407c-8dbc-90420af4410d",
+      "name": "Google Drive - Cherche dossier workflow (1 tag)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "sw1-e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "exist"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw1-ne",
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "notExists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "notexist"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1728,
+        1728
+      ],
+      "id": "6bdb33e8-79a8-4cad-a4b7-a11704947ba1",
+      "name": "Switch - Dossier workflow existe ? (1 tag)"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name.replace(/['\\/:]/g, '_') }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Cherche dossier tag1').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1504,
+        2112
+      ],
+      "id": "659c6eab-cdbb-4844-8a3c-8569c9011a86",
+      "name": "Google Drive - Crée dossier workflow (1 tag)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $now.toFormat('yyyy-MM-dd') }}",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1280,
+        2112
+      ],
+      "id": "3c511f1a-2e92-4d1f-87f2-b86d5716e3c1",
+      "name": "Google Drive - Cherche dossier date (1 tag, nouveau WF)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "sw2-e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "exist"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw2-ne",
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "notExists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "notexist"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1056,
+        2112
+      ],
+      "id": "f829dacc-87bd-4f2e-b73d-06f71b8e1194",
+      "name": "Switch - Date existe ? (1 tag, nouveau WF)"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $now.toFormat('yyyy-MM-dd') }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Crée dossier workflow (1 tag)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -832,
+        1944
+      ],
+      "id": "9cc6052b-de60-4604-b79b-1ee132c1c8ed",
+      "name": "Google Drive - Crée dossier date (1 tag, nouveau WF)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $now.toFormat('yyyy-MM-dd') }}",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Google Drive - Cherche dossier workflow (1 tag)').item.json.id }}",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1504,
+        1488
+      ],
+      "id": "22b86265-6642-4f99-8f23-9c82565db619",
+      "name": "Google Drive - Cherche dossier date (1 tag, WF existant)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.name }}",
+                    "rightValue": "={{ $now.toFormat('yyyy-MM-dd') }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "sw3-e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "exist"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw3-ne",
+                    "leftValue": "={{ $json.name }}",
+                    "rightValue": "={{ $now.toFormat('yyyy-MM-dd') }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "notexist"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1280,
+        1488
+      ],
+      "id": "90f4b704-613a-482d-9259-3981ad16db33",
+      "name": "Switch - Date existe ? (1 tag, WF existant)"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $now.toFormat('yyyy-MM-dd') }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Cherche dossier workflow (1 tag)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1056,
+        1632
+      ],
+      "id": "cb383873-e8b3-4749-99dc-19794b1a81a5",
+      "name": "Google Drive - Crée dossier date (1 tag, WF existant)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wfName = $('n8n API - Récupère tous les workflows').item.json.name;\nconst today = $now.toFormat('yyyy-MM-dd');\nconst targetName = wfName + '_' + today + '.json';\nconst existing = $input.all().filter(i => i.json.name === targetName && i.json.id);\nif (existing.length > 0) return existing.map(i => ({ json: { id: i.json.id, doDelete: true } }));\nreturn [{ json: { doDelete: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1056,
+        1320
+      ],
+      "id": "6cf70c3b-a873-4d69-a8cb-75dc6f56c658",
+      "name": "Code JS - Vérifie doublon (1 tag, WF existant, date existante)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ci1",
+              "leftValue": "={{ $json.doDelete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -832,
+        1320
+      ],
+      "id": "6776252e-8aa7-4872-9ccd-af00104283ac",
+      "name": "Si - Doublon ? (1 tag, WF existant, date existante)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -608,
+        1248
+      ],
+      "id": "04e728f8-2a9d-496e-8e7a-a6832003123a",
+      "name": "Google Drive - Supprime doublon (1 tag, WF existant, date existante)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) { item.binary = $('SplitInBatches - Boucle principale workflows').item.binary; }\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        1320
+      ],
+      "id": "5920b76c-c1f0-467f-bbef-2c7a4e59d8d3",
+      "name": "Code JS - Récupère binaire (1 tag, WF existant, date existante)"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name }}_{{ $now.toFormat('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Cherche dossier date (1 tag, WF existant)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -160,
+        1320
+      ],
+      "id": "f03de8fa-90f5-4851-892a-2edfb8943431",
+      "name": "Google Drive - Upload JSON (1 tag, WF existant, date existante)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wfName = $('n8n API - Récupère tous les workflows').item.json.name;\nconst today = $now.toFormat('yyyy-MM-dd');\nconst targetName = wfName + '_' + today + '.json';\nconst existing = $input.all().filter(i => i.json.name === targetName && i.json.id);\nif (existing.length > 0) return existing.map(i => ({ json: { id: i.json.id, doDelete: true } }));\nreturn [{ json: { doDelete: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        1632
+      ],
+      "id": "d7a7caf6-2a9a-4919-a1e0-1ac80aab7a2b",
+      "name": "Code JS - Vérifie doublon (1 tag, WF existant, nouvelle date)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ci2",
+              "leftValue": "={{ $json.doDelete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -608,
+        1632
+      ],
+      "id": "0cf4f671-0c9c-46aa-91bd-d5e15f98b926",
+      "name": "Si - Doublon ? (1 tag, WF existant, nouvelle date)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -384,
+        1560
+      ],
+      "id": "9dddbe1c-1a59-48fd-b4d1-7d0502af37d6",
+      "name": "Google Drive - Supprime doublon (1 tag, WF existant, nouvelle date)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) { item.binary = $('SplitInBatches - Boucle principale workflows').item.binary; }\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        1632
+      ],
+      "id": "99a37078-69af-46ae-b914-e86e5e9d451c",
+      "name": "Code JS - Récupère binaire (1 tag, WF existant, nouvelle date)"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name }}_{{ $now.toFormat('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Crée dossier date (1 tag, WF existant)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        64,
+        1632
+      ],
+      "id": "0afa9014-6afd-49d9-9613-801b5f0e9e24",
+      "name": "Google Drive - Upload JSON (1 tag, WF existant, nouvelle date)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wfName = $('n8n API - Récupère tous les workflows').item.json.name;\nconst today = $now.toFormat('yyyy-MM-dd');\nconst targetName = wfName + '_' + today + '.json';\nconst existing = $input.all().filter(i => i.json.name === targetName && i.json.id);\nif (existing.length > 0) return existing.map(i => ({ json: { id: i.json.id, doDelete: true } }));\nreturn [{ json: { doDelete: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        2256
+      ],
+      "id": "bc78d64d-15d3-4e38-80fc-5565a87d96d5",
+      "name": "Code JS - Vérifie doublon (1 tag, nouveau WF, date existante)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ci3",
+              "leftValue": "={{ $json.doDelete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -608,
+        2256
+      ],
+      "id": "42071cf4-34e7-457a-99a2-3614a9e94150",
+      "name": "Si - Doublon ? (1 tag, nouveau WF, date existante)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -384,
+        2184
+      ],
+      "id": "64af515c-5dfd-4a70-a138-f97e6b0b72d6",
+      "name": "Google Drive - Supprime doublon (1 tag, nouveau WF, date existante)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) { item.binary = $('SplitInBatches - Boucle principale workflows').item.binary; }\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        2256
+      ],
+      "id": "824e08c3-dc91-47a3-8504-306d60c22c13",
+      "name": "Code JS - Récupère binaire (1 tag, nouveau WF, date existante)"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "=data",
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name }}_{{ $now.toFormat('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Cherche dossier date (1 tag, nouveau WF)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        64,
+        2256
+      ],
+      "id": "2bb72d39-e5fd-41f2-9556-eee0b941f11f",
+      "name": "Google Drive - Upload JSON (1 tag, nouveau WF, date existante)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wfName = $('n8n API - Récupère tous les workflows').item.json.name;\nconst today = $now.toFormat('yyyy-MM-dd');\nconst targetName = wfName + '_' + today + '.json';\nconst existing = $input.all().filter(i => i.json.name === targetName && i.json.id);\nif (existing.length > 0) return existing.map(i => ({ json: { id: i.json.id, doDelete: true } }));\nreturn [{ json: { doDelete: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        1944
+      ],
+      "id": "0ae8fc65-e649-486f-90b5-0b52a5ba3374",
+      "name": "Code JS - Vérifie doublon (1 tag, nouveau WF, nouvelle date)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ci4",
+              "leftValue": "={{ $json.doDelete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -384,
+        1944
+      ],
+      "id": "25fedb50-51e4-4fef-a590-148bc626557a",
+      "name": "Si - Doublon ? (1 tag, nouveau WF, nouvelle date)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -160,
+        1872
+      ],
+      "id": "2045ced8-fd7a-4eb5-9e68-b9c3caabc5e1",
+      "name": "Google Drive - Supprime doublon (1 tag, nouveau WF, nouvelle date)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) { item.binary = $('SplitInBatches - Boucle principale workflows').item.binary; }\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        1944
+      ],
+      "id": "37466383-3b40-4126-b70b-066dbe5803f3",
+      "name": "Code JS - Récupère binaire (1 tag, nouveau WF, nouvelle date)"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name }}_{{ $now.toFormat('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Crée dossier date (1 tag, nouveau WF)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        288,
+        2304
+      ],
+      "id": "91312388-7a63-467d-af77-619df108ce11",
+      "name": "Google Drive - Upload JSON (1 tag, nouveau WF, nouvelle date)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $('Code JS — Normalise tags').item.json.tag2",
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Google Drive - Cherche dossier tag1').item.json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2176,
+        384
+      ],
+      "id": "16a426b8-9e88-4345-82dc-351bafb76175",
+      "name": "Google Drive - Cherche dossier tag2 (2 tags)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c-t2",
+              "leftValue": "={{ $json.name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1952,
+        384
+      ],
+      "id": "b37078cd-da91-4bb2-872f-83f25318f98e",
+      "name": "Si - Dossier tag2 trouvé ? (2 tags)"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=⚠️ Dossier tag2 manquant pour {{ $('n8n API - Récupère tous les workflows').item.json.name }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1728,
+        384
+      ],
+      "id": "efc1d165-14e1-446b-b4dd-9c893c3bfe3d",
+      "name": "Telegram - Erreur dossier manquant (2 tags)",
+      "webhookId": "d9244e60-7191-4a1c-b45f-e2c420fe3ade",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $('n8n API - Récupère tous les workflows').item.json.name.replace(/['\\/:]/g, '_') }}",
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Google Drive - Cherche dossier tag2 (2 tags)').item.json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1728,
+        576
+      ],
+      "id": "be8186e7-f16b-45f7-98e6-33b953f12732",
+      "name": "Google Drive - Cherche dossier workflow (2 tags)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "sw4-e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "exist"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw4-ne",
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "notExists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "notexist"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1504,
+        576
+      ],
+      "id": "bd7f59e1-336e-4453-ad8c-70e42d6a71bf",
+      "name": "Switch - Dossier workflow existe ? (2 tags)"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name.replace(/['\\/:]/g, '_') }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Cherche dossier tag2 (2 tags)').first().json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1280,
+        240
+      ],
+      "id": "93376146-ed06-44cd-b67c-fd144b6658ce",
+      "name": "Google Drive - Crée dossier workflow (2 tags)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $now.toFormat('yyyy-MM-dd') }}",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1056,
+        240
+      ],
+      "id": "421cd570-0bdf-4f59-bf44-76a10a0fbea4",
+      "name": "Google Drive - Cherche dossier date (2 tags, nouveau WF)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "exists",
+                      "singleValue": true
+                    },
+                    "id": "sw5-e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "exist"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw5-ne",
+                    "leftValue": "={{ $json.id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "notExists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "notexist"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -832,
+        240
+      ],
+      "id": "dfe4f2fe-c998-4f08-bb12-1ab8357e1d47",
+      "name": "Switch - Date existe ? (2 tags, nouveau WF)"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $now.toFormat('yyyy-MM-dd') }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Crée dossier workflow (2 tags)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -608,
+        384
+      ],
+      "id": "3b8b3e1f-06ef-47c1-9801-ff00f7a1bb09",
+      "name": "Google Drive - Crée dossier date (2 tags, nouveau WF)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $now.toFormat('yyyy-MM-dd') }}",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Google Drive - Cherche dossier workflow (2 tags)').item.json.id }}",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1280,
+        864
+      ],
+      "id": "4cfe9158-cfcf-4fca-aa4a-16ec4d11b5f0",
+      "name": "Google Drive - Cherche dossier date (2 tags, WF existant)",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.name }}",
+                    "rightValue": "={{ $now.toFormat('yyyy-MM-dd') }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "sw6-e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "exist"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw6-ne",
+                    "leftValue": "={{ $json.name }}",
+                    "rightValue": "={{ $now.toFormat('yyyy-MM-dd') }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "notexist"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -1056,
+        864
+      ],
+      "id": "200e836f-481f-420c-8b2b-c33cec774c95",
+      "name": "Switch - Date existe ? (2 tags, WF existant)"
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $now.toFormat('yyyy-MM-dd') }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Cherche dossier workflow (2 tags)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -832,
+        696
+      ],
+      "id": "8206eb76-ed8b-4455-9492-49e7933b78dd",
+      "name": "Google Drive - Crée dossier date (2 tags, WF existant)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wfName = $('n8n API - Récupère tous les workflows').item.json.name;\nconst today = $now.toFormat('yyyy-MM-dd');\nconst targetName = wfName + '_' + today + '.json';\nconst existing = $input.all().filter(i => i.json.name === targetName && i.json.id);\nif (existing.length > 0) return existing.map(i => ({ json: { id: i.json.id, doDelete: true } }));\nreturn [{ json: { doDelete: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        1008
+      ],
+      "id": "4a171183-c01f-4a44-ada9-d0c57493f0e3",
+      "name": "Code JS - Vérifie doublon (2 tags, WF existant, date existante)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ci5",
+              "leftValue": "={{ $json.doDelete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -608,
+        1008
+      ],
+      "id": "3451826d-81c2-4c1e-956d-debc1223d693",
+      "name": "Si - Doublon ? (2 tags, WF existant, date existante)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -384,
+        936
+      ],
+      "id": "dd0badb1-02ec-4ebd-b945-d1e4814d9ee8",
+      "name": "Google Drive - Supprime doublon (2 tags, WF existant, date existante)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) { item.binary = $('SplitInBatches - Boucle principale workflows').item.binary; }\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        1008
+      ],
+      "id": "ce2f3dcf-aff6-4754-a9f6-dda867e00995",
+      "name": "Code JS - Récupère binaire (2 tags, WF existant, date existante)"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name }}_{{ $now.toFormat('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Cherche dossier date (2 tags, WF existant)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        64,
+        1008
+      ],
+      "id": "752b1cc1-3366-4a9b-abeb-844817bd4ca0",
+      "name": "Google Drive - Upload JSON (2 tags, WF existant, date existante)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wfName = $('n8n API - Récupère tous les workflows').item.json.name;\nconst today = $now.toFormat('yyyy-MM-dd');\nconst targetName = wfName + '_' + today + '.json';\nconst existing = $input.all().filter(i => i.json.name === targetName && i.json.id);\nif (existing.length > 0) return existing.map(i => ({ json: { id: i.json.id, doDelete: true } }));\nreturn [{ json: { doDelete: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        696
+      ],
+      "id": "435e70dd-7601-47d1-8133-0a08025be173",
+      "name": "Code JS - Vérifie doublon (2 tags, WF existant, nouvelle date)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ci6",
+              "leftValue": "={{ $json.doDelete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -384,
+        696
+      ],
+      "id": "b1fe0313-2836-4539-89c5-e3c5bce3ec75",
+      "name": "Si - Doublon ? (2 tags, WF existant, nouvelle date)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -160,
+        624
+      ],
+      "id": "13de14a8-3c7b-41d1-9c33-e61a4cdfb3bc",
+      "name": "Google Drive - Supprime doublon (2 tags, WF existant, nouvelle date)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) { item.binary = $('SplitInBatches - Boucle principale workflows').item.binary; }\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        696
+      ],
+      "id": "b56520f5-aae1-41f8-96f2-905ef6fb0b83",
+      "name": "Code JS - Récupère binaire (2 tags, WF existant, nouvelle date)"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name }}_{{ $now.toFormat('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Crée dossier date (2 tags, WF existant)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        288,
+        1152
+      ],
+      "id": "92951965-fee0-49cd-8170-eeb4cf7278bb",
+      "name": "Google Drive - Upload JSON (2 tags, WF existant, nouvelle date)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wfName = $('n8n API - Récupère tous les workflows').item.json.name;\nconst today = $now.toFormat('yyyy-MM-dd');\nconst targetName = wfName + '_' + today + '.json';\nconst existing = $input.all().filter(i => i.json.name === targetName && i.json.id);\nif (existing.length > 0) return existing.map(i => ({ json: { id: i.json.id, doDelete: true } }));\nreturn [{ json: { doDelete: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        72
+      ],
+      "id": "5872f274-7d03-4b21-a010-3a4360527ac3",
+      "name": "Code JS - Vérifie doublon (2 tags, nouveau WF, date existante)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ci7",
+              "leftValue": "={{ $json.doDelete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -384,
+        72
+      ],
+      "id": "6ef496b4-05df-4c9c-8220-7bab0695feaa",
+      "name": "Si - Doublon ? (2 tags, nouveau WF, date existante)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -160,
+        0
+      ],
+      "id": "34d5d336-f4d7-4a84-b566-513d3405f313",
+      "name": "Google Drive - Supprime doublon (2 tags, nouveau WF, date existante)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) { item.binary = $('SplitInBatches - Boucle principale workflows').item.binary; }\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        72
+      ],
+      "id": "8b5c123a-4a53-4447-8952-3b339061dfcd",
+      "name": "Code JS - Récupère binaire (2 tags, nouveau WF, date existante)"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "=data",
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name }}_{{ $now.toFormat('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Cherche dossier date (2 tags, nouveau WF)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        288,
+        576
+      ],
+      "id": "ec42857e-d594-468a-86cc-30b02bfc3072",
+      "name": "Google Drive - Upload JSON (2 tags, nouveau WF, date existante)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const wfName = $('n8n API - Récupère tous les workflows').item.json.name;\nconst today = $now.toFormat('yyyy-MM-dd');\nconst targetName = wfName + '_' + today + '.json';\nconst existing = $input.all().filter(i => i.json.name === targetName && i.json.id);\nif (existing.length > 0) return existing.map(i => ({ json: { id: i.json.id, doDelete: true } }));\nreturn [{ json: { doDelete: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        384
+      ],
+      "id": "9becbf2c-a89d-4b47-a636-382c9f0e659b",
+      "name": "Code JS - Vérifie doublon (2 tags, nouveau WF, nouvelle date)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ci8",
+              "leftValue": "={{ $json.doDelete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -160,
+        384
+      ],
+      "id": "83709d25-d2c8-4c2e-929b-ba0381c1c3ad",
+      "name": "Si - Doublon ? (2 tags, nouveau WF, nouvelle date)"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        64,
+        312
+      ],
+      "id": "0e776388-8c2d-4a73-bb92-280550155e37",
+      "name": "Google Drive - Supprime doublon (2 tags, nouveau WF, nouvelle date)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) { item.binary = $('SplitInBatches - Boucle principale workflows').item.binary; }\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        864
+      ],
+      "id": "de9faa66-8a91-481a-8d5b-d3bae40bb12a",
+      "name": "Code JS - Récupère binaire (2 tags, nouveau WF, nouvelle date)"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('n8n API - Récupère tous les workflows').item.json.name }}_{{ $now.toFormat('yyyy-MM-dd') }}.json",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Google Drive - Crée dossier date (2 tags, nouveau WF)').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        512,
+        1800
+      ],
+      "id": "20e8df08-44f2-4169-8b41-d77ab04de363",
+      "name": "Google Drive - Upload JSON (2 tags, nouveau WF, nouvelle date)",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.emafuites.fr/api/v1/tags",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "n8nApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -4416,
+        2976
+      ],
+      "id": "da2acfbf-2447-4071-9fce-9b6d2b292d4b",
+      "name": "n8n API - Récupère tags",
+      "credentials": {
+        "n8nApi": {
+          "id": "LuFO2lPkS3PFcSxw",
+          "name": "n8n account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "rclone lsf \"gdrive:/BACK UP/BACK UP N8N\" --dirs-only --recursive --max-depth 2"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -4192,
+        2976
+      ],
+      "id": "4455140d-230a-4ffa-96c6-3c6a85453d5a",
+      "name": "Execute Command - Liste dossiers Drive",
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "bt56RSR5H3bzgKsg",
+          "name": "SSH Private Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rcloneOutput = $('Execute Command - Liste dossiers Drive').item.json.stdout;\n\nconst allPaths = rcloneOutput\n  .split('\\n')\n  .map(l => l.trim().replace(/\\/$/, ''))\n  .filter(Boolean);\n\n// Niveau 1 : pas de slash dans le chemin\nconst niveau1 = allPaths.filter(p => !p.includes('/'));\n\n// Niveau 2 : un slash → { \"CHAT BOT\": [\"BOT WHAT'SAPP\", ...], ... }\nconst niveau2 = {};\nallPaths\n  .filter(p => (p.match(/\\//g) || []).length === 1)\n  .forEach(p => {\n    const [parent, child] = p.split('/');\n    if (!niveau2[parent]) niveau2[parent] = [];\n    niveau2[parent].push(child);\n  });\n\nconst staticData = $getWorkflowStaticData('global');\nstaticData.niveau1 = niveau1;\nstaticData.niveau2 = niveau2;\n\nreturn [{ json: { niveau1, niveau2 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3072,
+        1128
+      ],
+      "id": "7ab04b93-8a63-45ea-a463-abd270b6b9e1",
+      "name": "Code JS — intersection niveau1 & niveau2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst niveau1 = staticData.niveau1 ?? [];\nconst niveau2 = staticData.niveau2 ?? {};\n\nconst wf = $('n8n API - Récupère tous les workflows').item.json;\nconst tags = wf.tags ?? [];\n\n// tag1 = celui qui matche un dossier racine Drive\nconst tag1obj = tags.find(t => niveau1.includes(t.name));\nconst tag1 = tag1obj?.name ?? null;\n\n// tag2 = celui qui matche un sous-dossier de tag1\nconst sousDossiers = tag1 ? (niveau2[tag1] ?? []) : [];\nconst tag2obj = tags.find(t => t !== tag1obj && sousDossiers.includes(t.name));\nconst tag2 = tag2obj?.name ?? null;\n\nreturn [{\n  json: {\n    wfId:   wf.id,\n    wfName: wf.name,\n    tag1,\n    tag2,\n    hasTag2: tag2 !== null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2848,
+        1128
+      ],
+      "id": "b0074eb0-c170-4de3-98bf-f6e97fa76713",
+      "name": "Code JS — Normalise tags"
+    }
+  ],
+  "connections": {
+    "Cron - Toutes les heures": {
+      "main": [
+        [
+          {
+            "node": "n8n API - Récupère tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n API - Récupère tous les workflows": {
+      "main": [
+        [
+          {
+            "node": "Si - Workflow archivé ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Workflow archivé ?": {
+      "main": [
+        [
+          {
+            "node": "n8n API - Supprime workflow archivé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Vérifie config notif erreurs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Convertit workflow en fichier JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie config notif erreurs": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Rapport notif erreurs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convertit workflow en fichier JSON": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches - Boucle principale workflows": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Backup terminé",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS — intersection niveau1 & niveau2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Cherche dossier tag1": {
+      "main": [
+        [
+          {
+            "node": "Si - 1 tag ou 2 tags ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - 1 tag ou 2 tags ?": {
+      "main": [
+        [
+          {
+            "node": "Si - Dossier tag1 trouvé ? (1 tag)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Drive - Cherche dossier tag2 (2 tags)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Dossier tag1 trouvé ? (1 tag)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Cherche dossier workflow (1 tag)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - Erreur dossier manquant (1 tag)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Cherche dossier workflow (1 tag)": {
+      "main": [
+        [
+          {
+            "node": "Switch - Dossier workflow existe ? (1 tag)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Dossier workflow existe ? (1 tag)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Cherche dossier date (1 tag, WF existant)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Drive - Crée dossier workflow (1 tag)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Crée dossier workflow (1 tag)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Cherche dossier date (1 tag, nouveau WF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Cherche dossier date (1 tag, nouveau WF)": {
+      "main": [
+        [
+          {
+            "node": "Switch - Date existe ? (1 tag, nouveau WF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Date existe ? (1 tag, nouveau WF)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie doublon (1 tag, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Drive - Crée dossier date (1 tag, nouveau WF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Crée dossier date (1 tag, nouveau WF)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie doublon (1 tag, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie doublon (1 tag, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Si - Doublon ? (1 tag, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Doublon ? (1 tag, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Supprime doublon (1 tag, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Récupère binaire (1 tag, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Supprime doublon (1 tag, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Récupère binaire (1 tag, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Récupère binaire (1 tag, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload JSON (1 tag, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload JSON (1 tag, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie doublon (1 tag, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Si - Doublon ? (1 tag, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Doublon ? (1 tag, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Supprime doublon (1 tag, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Récupère binaire (1 tag, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Supprime doublon (1 tag, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Récupère binaire (1 tag, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Récupère binaire (1 tag, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload JSON (1 tag, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload JSON (1 tag, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Cherche dossier date (1 tag, WF existant)": {
+      "main": [
+        [
+          {
+            "node": "Switch - Date existe ? (1 tag, WF existant)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Date existe ? (1 tag, WF existant)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie doublon (1 tag, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Drive - Crée dossier date (1 tag, WF existant)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie doublon (1 tag, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Si - Doublon ? (1 tag, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Doublon ? (1 tag, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Supprime doublon (1 tag, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Récupère binaire (1 tag, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Supprime doublon (1 tag, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Récupère binaire (1 tag, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Récupère binaire (1 tag, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload JSON (1 tag, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload JSON (1 tag, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Crée dossier date (1 tag, WF existant)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie doublon (1 tag, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie doublon (1 tag, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Si - Doublon ? (1 tag, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Doublon ? (1 tag, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Supprime doublon (1 tag, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Récupère binaire (1 tag, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Supprime doublon (1 tag, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Récupère binaire (1 tag, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Récupère binaire (1 tag, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload JSON (1 tag, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload JSON (1 tag, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Cherche dossier tag2 (2 tags)": {
+      "main": [
+        [
+          {
+            "node": "Si - Dossier tag2 trouvé ? (2 tags)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Dossier tag2 trouvé ? (2 tags)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Cherche dossier workflow (2 tags)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - Erreur dossier manquant (2 tags)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Cherche dossier workflow (2 tags)": {
+      "main": [
+        [
+          {
+            "node": "Switch - Dossier workflow existe ? (2 tags)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Dossier workflow existe ? (2 tags)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Cherche dossier date (2 tags, WF existant)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Drive - Crée dossier workflow (2 tags)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Crée dossier workflow (2 tags)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Cherche dossier date (2 tags, nouveau WF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Cherche dossier date (2 tags, nouveau WF)": {
+      "main": [
+        [
+          {
+            "node": "Switch - Date existe ? (2 tags, nouveau WF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Date existe ? (2 tags, nouveau WF)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie doublon (2 tags, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Drive - Crée dossier date (2 tags, nouveau WF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Crée dossier date (2 tags, nouveau WF)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie doublon (2 tags, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie doublon (2 tags, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Si - Doublon ? (2 tags, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Doublon ? (2 tags, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Supprime doublon (2 tags, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Récupère binaire (2 tags, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Supprime doublon (2 tags, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Récupère binaire (2 tags, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Récupère binaire (2 tags, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload JSON (2 tags, nouveau WF, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload JSON (2 tags, nouveau WF, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie doublon (2 tags, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Si - Doublon ? (2 tags, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Doublon ? (2 tags, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Supprime doublon (2 tags, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Récupère binaire (2 tags, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Supprime doublon (2 tags, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Récupère binaire (2 tags, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Récupère binaire (2 tags, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload JSON (2 tags, nouveau WF, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload JSON (2 tags, nouveau WF, date existante)": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Cherche dossier date (2 tags, WF existant)": {
+      "main": [
+        [
+          {
+            "node": "Switch - Date existe ? (2 tags, WF existant)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch - Date existe ? (2 tags, WF existant)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie doublon (2 tags, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Drive - Crée dossier date (2 tags, WF existant)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie doublon (2 tags, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Si - Doublon ? (2 tags, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Doublon ? (2 tags, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Supprime doublon (2 tags, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Récupère binaire (2 tags, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Supprime doublon (2 tags, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Récupère binaire (2 tags, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Récupère binaire (2 tags, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload JSON (2 tags, WF existant, date existante)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload JSON (2 tags, WF existant, date existante)": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Crée dossier date (2 tags, WF existant)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie doublon (2 tags, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie doublon (2 tags, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Si - Doublon ? (2 tags, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Doublon ? (2 tags, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Supprime doublon (2 tags, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Récupère binaire (2 tags, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Supprime doublon (2 tags, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Récupère binaire (2 tags, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Récupère binaire (2 tags, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Upload JSON (2 tags, WF existant, nouvelle date)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Upload JSON (2 tags, WF existant, nouvelle date)": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches - Boucle principale workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n API - Récupère tags": {
+      "main": [
+        [
+          {
+            "node": "Execute Command - Liste dossiers Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Command - Liste dossiers Drive": {
+      "main": [
+        [
+          {
+            "node": "n8n API - Récupère tous les workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS — intersection niveau1 & niveau2": {
+      "main": [
+        [
+          {
+            "node": "Code JS — Normalise tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS — Normalise tags": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Cherche dossier tag1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

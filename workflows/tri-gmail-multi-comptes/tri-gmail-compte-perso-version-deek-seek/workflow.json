@@ -1,0 +1,1042 @@
+{
+  "name": "TRI GMAIL COMPTE PERSO version deek seek",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2752,
+        -160
+      ],
+      "id": "8a1b54c5-1110-4af4-bc10-82fd9bec9064",
+      "name": "Cron - Toutes les heures"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1683212892,
+          "mode": "list",
+          "cachedResultName": "prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1683212892"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Actif",
+              "lookupValue": "OUI"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -2528,
+        -160
+      ],
+      "id": "4fa1aab0-7519-4883-8cb3-16cce462b01f",
+      "name": "Google Sheets - Prompt Actif",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -2304,
+        -160
+      ],
+      "id": "d4faf921-ad5a-4041-9fd5-47405ea05cd1",
+      "name": "Gmail - Récupère labels",
+      "webhookId": "5a8c7846-2300-49d3-ba05-9efa5ab0eed0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\n\nconst systemLabelsToIgnore = [\n  'chat', 'draft', 'trash', 'spam', 'starred', 'unread', \n  'category_', 'circle', 'star'\n];\n\nconst labelsPropres = allItems\n  .map(item => item.json)\n  .filter(label => {\n    const n = label.name.toLowerCase();\n    if (systemLabelsToIgnore.some(sys => n.includes(sys))) return false;\n    return label.type === 'user';\n  })\n  .map(label => `- [${label.id}] : ${label.name}`);\n\nreturn [{\n  json: {\n    liste_dossiers_texte: labelsPropres.join('\\n'),\n    stats: {\n      labels_envoyes_ia: labelsPropres.length\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2080,
+        -160
+      ],
+      "id": "5d6849ac-392e-40e7-a2b6-c2405faeaa05",
+      "name": "Code JS - Formate labels"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ],
+          "receivedBefore": "={{ $now.minus({weeks: 4}).toISO() }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1856,
+        -160
+      ],
+      "id": "bafcf379-c5b7-488c-826b-cf9c6b1098a7",
+      "name": "Gmail - Récupère emails INBOX",
+      "webhookId": "7f708918-2a90-437b-ac4d-80d59fe388f7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "internalDate"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        -1632,
+        -160
+      ],
+      "id": "518e1de4-3867-4459-a184-ea9f6468a2d3",
+      "name": "Tri par date"
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.threadId }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1408,
+        -160
+      ],
+      "id": "6e54b2c9-dd23-4306-8a2e-719ba4065b7c",
+      "name": "Gmail - Récupère thread",
+      "webhookId": "d4a7c05d-6f42-4a0b-a3bb-c9282fb8d5be",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const threads = $input.all();\nlet resultats = [];\n\nthreads.forEach((threadItem, index) => {\n  let dossiersPersos = [];\n  const threadActuel = threadItem.json;\n\n  if (threadActuel.messages) {\n    threadActuel.messages.forEach(msg => {\n      if (msg.labels) {\n        msg.labels.forEach(label => {\n          if (label.id.startsWith('Label_') && !dossiersPersos.some(d => d.id === label.id)) {\n            dossiersPersos.push({ id: label.id, name: label.name });\n          }\n        });\n      }\n    });\n  }\n\n  resultats.push({\n    json: {\n      ...threadActuel,\n      deja_classe: dossiersPersos.length > 0,\n      dossiers_trouves: dossiersPersos\n    },\n    pairedItem: { item: index }\n  });\n});\n\nreturn resultats;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1184,
+        -160
+      ],
+      "id": "2ddebabe-ed5d-47f8-8be7-c051c33b2480",
+      "name": "Code JS - Détecte dossier existant"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "86ad8d2c-d9ab-4c83-8849-0c0d9e0ee5fa",
+              "leftValue": "={{ $json.deja_classe }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -960,
+        -160
+      ],
+      "id": "85487e6d-b7e1-4541-9122-14c904e1ffac",
+      "name": "Si - Déjà classé ?"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $json.messages[$json.messages.length - 1].id }}",
+        "labelIds": "={{ $json.dossiers_trouves.map(d => d.id) }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -736,
+        -256
+      ],
+      "id": "43b05fa8-7743-4c5e-9c37-85875b76307c",
+      "name": "Gmail - Ajoute label (déjà classé)",
+      "webhookId": "51cac227-82a5-4d27-8ab2-bff9fdb59591",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "removeLabels",
+        "messageId": "={{ $('Si - Déjà classé ?').item.json.messages[$('Si - Déjà classé ?').item.json.messages.length - 1].id }}",
+        "labelIds": [
+          "INBOX"
+        ]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -512,
+        -256
+      ],
+      "id": "50526154-0fc8-422a-a7fe-1fc95304bfef",
+      "name": "Gmail - Retire INBOX (déjà classé)",
+      "webhookId": "8fdeb010-2e2a-4bf2-bf90-2af7f690c33e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const emails = $input.all();\nconst nbEmails = emails.length;\nconst seuilChauffe = 50;\n\nreturn emails.map((item, index) => ({\n  json: {\n    ...item.json,\n    nb_emails: nbEmails,\n    chauffe_necessaire: nbEmails > seuilChauffe,\n    index: index\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        -64
+      ],
+      "id": "dfc6a90d-f420-44e6-b82c-b5489696bd92",
+      "name": "Code JS - Prépare chauffe"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c4e4f1bf-c79c-4f0c-94ea-7baf20e5ff62",
+              "leftValue": "={{ $json.chauffe_necessaire }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        -64
+      ],
+      "id": "fa615560-c101-4890-96d3-8e851ad1977e",
+      "name": "Si - Chauffe nécessaire ?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const promptTemplate = $('Google Sheets - Prompt Actif').first().json.Prompt;\nconst listesDossiers = $('Code JS - Formate labels').item.json.liste_dossiers_texte;\nconst systemPrompt   = promptTemplate.replace('${listesDossiers}', listesDossiers);\n\nconst userMessage = `Expéditeur : ${$json.From}\\nSujet : ${$json.Subject}\\nContenu : ${$json.snippet}\\nDate : ${$json.internalDate}`;\n\nreturn {\n  json: {\n    requestBody: JSON.stringify({\n      model: \"deepseek-chat\",\n      temperature: 0,\n      max_tokens: 10,\n      messages: [\n        { role: \"system\", content: systemPrompt },\n        { role: \"user\",   content: \"ping\"        }\n      ]\n    })\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        16
+      ],
+      "id": "7e31558a-e0dc-4acb-91d5-3561e3fad8ef",
+      "name": "Code JS - Chauffe cache (body)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        160,
+        -64
+      ],
+      "id": "48e10292-e33c-48e3-9fe7-57d446c6ce1c",
+      "name": "DeepSeek - Chauffe cache",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "MBt6ozX97KVIAwcD",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const usage = $json.usage;\nconst cachedTokens = usage.prompt_cache_hit_tokens || 0;\nconst promptTokens = usage.prompt_tokens || 1;\nconst cacheRatio = cachedTokens / promptTokens;\n\nconst staticData = $getWorkflowStaticData('global');\nconst tentatives = staticData.tentatives || 0;\nstaticData.tentatives = tentatives + 1;\n\nconst cacheChaud = cacheRatio > 0.7 || tentatives >= 3;\nif (cacheChaud) staticData.tentatives = 0;\n\nreturn {\n  json: {\n    cache_chaud: cacheChaud,\n    cache_ratio: Math.round(cacheRatio * 100),\n    cached_tokens: cachedTokens,\n    prompt_tokens: promptTokens,\n    tentatives: tentatives + 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        -64
+      ],
+      "id": "b6547309-50aa-4d41-950a-d341cbb43aaf",
+      "name": "Code JS - Vérifie cache chaud"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cbca57dd-0c5d-4db5-9c0b-8bf99bbce01d",
+              "leftValue": "={{ $json.cache_chaud }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        608,
+        -64
+      ],
+      "id": "a3b66dd3-e214-49f1-8ced-247b4b2076e6",
+      "name": "Si - Cache chaud ?"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        832,
+        64
+      ],
+      "id": "873a54df-22f0-4786-a5b9-1f4284fa7efe",
+      "name": "Attente 2s",
+      "webhookId": "c154b217-4438-4721-bbcb-ecef7b05a28e"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    ...$json,\n    From: ($json.From || '')\n      .replace(/<[^>]*>/g, '')\n      .replace(/\"/g, '')\n      .trim(),\n    Subject: ($json.Subject || '')\n      .replace(/\"/g, \"'\")\n      .replace(/[\\r\\n]+/g, ' ')\n      .trim(),\n    snippet: ($json.snippet || '')\n      .replace(/[\\u034F\\u00AD\\u200B-\\u200D\\uFEFF]/g, '')\n      .replace(/͏/g, '')\n      .replace(/\"/g, \"'\")\n      .replace(/[\\r\\n]+/g, ' ')\n      .trim()\n      .substring(0, 500)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        -192
+      ],
+      "id": "4dfbb6f9-7194-45bd-bf56-c90156e6a028",
+      "name": "Code JS - Nettoie email"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const promptTemplate = $('Google Sheets - Prompt Actif').first().json.Prompt;\nconst listesDossiers = $('Code JS - Formate labels').item.json.liste_dossiers_texte;\nconst systemPrompt   = promptTemplate.replace('${listesDossiers}', listesDossiers);\n\nconst userMessage = `Expéditeur : ${$json.From}\\nSujet : ${$json.Subject}\\nContenu : ${$json.snippet}\\nDate : ${$json.internalDate}`;\n\nreturn {\n  json: {\n    ...$json,\n    requestBody: JSON.stringify({\n      model: \"deepseek-chat\",\n      temperature: 0,\n      max_tokens: 500,\n      messages: [\n        { role: \"system\", content: systemPrompt },\n        { role: \"user\",   content: userMessage  }\n      ]\n    })\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        -192
+      ],
+      "id": "7454bb41-71f8-43ab-9c35-f421d7b9ade7",
+      "name": "Code JS - Prépare classification"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1280,
+        -192
+      ],
+      "id": "2a530515-5356-4a36-840d-03b22722172b",
+      "name": "DeepSeek - Classification",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "MBt6ozX97KVIAwcD",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const message = $json.choices[0].message;\nconst text = (message.content || message.reasoning_content || '').trim();\n\nif (!text) {\n  return { \n    json: { \n      error: true, \n      emailId: $json.id,\n      raw: 'content vide'\n    }\n  };\n}\n\nconst cleaned = text\n  .replace(/^```json\\n?/, '')\n  .replace(/```$/, '')\n  .trim();\n\ntry {\n  return { json: JSON.parse(cleaned) };\n} catch(e) {\n  return { \n    json: { \n      error: true, \n      emailId: $json.id,\n      raw: cleaned\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        -192
+      ],
+      "id": "977db527-ecd3-4541-91b6-feeb6b8a011e",
+      "name": "Code JS - Parse résultat"
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('Si - Déjà classé ?').item.json.id }}",
+        "labelIds": "={{ $json.labelId }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1728,
+        -192
+      ],
+      "id": "2117a6e6-b7b2-4498-a5f0-7ed296b4a4c7",
+      "name": "Gmail - Ajoute label classif",
+      "webhookId": "352785e5-2b9a-426a-9e6b-16b936b8d576",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "removeLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": [
+          "INBOX"
+        ]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1952,
+        -192
+      ],
+      "id": "5b8f5e35-89ee-406c-ac84-9bdadece22c5",
+      "name": "Gmail - Retire INBOX classif",
+      "webhookId": "4a844f71-0da2-4c7e-920d-fd147ec67b7a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "classifications",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Sujet": "={{ $('Code JS - Parse résultat').item.json.subject }}",
+            "Expéditeur": "={{ $('Code JS - Parse résultat').item.json.sender }}",
+            "Tokens Input": "={{ $('DeepSeek - Classification').item.json.usage.prompt_tokens }}",
+            "Tokens Output": "={{ $('DeepSeek - Classification').item.json.usage.completion_tokens }}",
+            "Tokens Cache Lu": "={{ $('DeepSeek - Classification').item.json.usage.prompt_tokens_details.cached_tokens }}",
+            "Date": "={{ $('Code JS - Parse résultat').item.json.formattedDate }}",
+            "ANALYSER ?": "NON",
+            "prompt_version": "={{ $('Google Sheets - Prompt Actif').first().json.Version }}",
+            "Coût estimé ($)": "={{ (($('DeepSeek - Classification').item.json.usage.prompt_tokens * 0.00000014) + ($('DeepSeek - Classification').item.json.usage.completion_tokens * 0.00000028)).toFixed(6) }}",
+            "Contenue de l'email": "={{ $('Code JS - Nettoie email').item.json.snippet }}\""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Expéditeur",
+              "displayName": "Expéditeur",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sujet",
+              "displayName": "Sujet",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "categorie_attribuee",
+              "displayName": "categorie_attribuee",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "correct",
+              "displayName": "correct",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "commentaire",
+              "displayName": "commentaire",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "corps_resume",
+              "displayName": "corps_resume",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tokens Input",
+              "displayName": "Tokens Input",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tokens Cache Lu",
+              "displayName": "Tokens Cache Lu",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tokens Output",
+              "displayName": "Tokens Output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Coût estimé ($)",
+              "displayName": "Coût estimé ($)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ANALYSER ?",
+              "displayName": "ANALYSER ?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Contenue de l'email",
+              "displayName": "Contenue de l'email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "prompt_version",
+              "displayName": "prompt_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2176,
+        -192
+      ],
+      "id": "44e2ee72-dba2-4173-a645-11207fd55de8",
+      "name": "Google Sheets - Enregistre classification",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "090a84a5-48fe-4e6b-bf29-7f9720fb2215",
+              "leftValue": "={{ $json.nb_emails }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -512,
+        -64
+      ],
+      "id": "2b8f9c29-26d9-4ea3-af9e-e1fa5745c796",
+      "name": "Si - Seuil nb emails"
+    }
+  ],
+  "connections": {
+    "Cron - Toutes les heures": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Prompt Actif",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Prompt Actif": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Récupère labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Récupère labels": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Formate labels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Formate labels": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Récupère emails INBOX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Récupère emails INBOX": {
+      "main": [
+        [
+          {
+            "node": "Tri par date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tri par date": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Récupère thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Récupère thread": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Détecte dossier existant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Détecte dossier existant": {
+      "main": [
+        [
+          {
+            "node": "Si - Déjà classé ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Déjà classé ?": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Ajoute label (déjà classé)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Prépare chauffe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Ajoute label (déjà classé)": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Retire INBOX (déjà classé)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Prépare chauffe": {
+      "main": [
+        [
+          {
+            "node": "Si - Seuil nb emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Chauffe nécessaire ?": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Chauffe cache (body)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code JS - Nettoie email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Chauffe cache (body)": {
+      "main": [
+        [
+          {
+            "node": "DeepSeek - Chauffe cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek - Chauffe cache": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Vérifie cache chaud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Vérifie cache chaud": {
+      "main": [
+        [
+          {
+            "node": "Si - Cache chaud ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Cache chaud ?": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Nettoie email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Attente 2s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attente 2s": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Chauffe cache (body)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Nettoie email": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Prépare classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Prépare classification": {
+      "main": [
+        [
+          {
+            "node": "DeepSeek - Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek - Classification": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Parse résultat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Parse résultat": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Ajoute label classif",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Ajoute label classif": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Retire INBOX classif",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Retire INBOX classif": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Enregistre classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Seuil nb emails": {
+      "main": [
+        [
+          {
+            "node": "Si - Chauffe nécessaire ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

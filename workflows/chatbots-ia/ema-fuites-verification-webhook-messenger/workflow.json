@@ -1,0 +1,59 @@
+{
+  "name": "EMA Fuites - Vérification Webhook Messenger",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "messenger-ema",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "id": "9f25fa5b-aaba-4c71-9d07-f9ec2a0786ab",
+      "name": "Webhook - Vérification Messenger",
+      "webhookId": "messenger-ema-verify"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\n\nconst VERIFY_TOKEN = 'YOUR_MESSENGER_VERIFY_TOKEN';\n\nconst mode      = query['hub.mode']         || query['hub_mode'];\nconst token     = query['hub.verify_token'] || query['hub_verify_token'];\nconst challenge = query['hub.challenge']    || query['hub_challenge'];\n\nif (mode === 'subscribe' && token === VERIFY_TOKEN) {\n  return [{ json: { challenge: challenge, valid: true } }];\n}\n\nreturn [{ json: { challenge: '', valid: false } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 0],
+      "id": "e6c75c34-bae1-445d-a611-09b3c2789e09",
+      "name": "Code JS - Vérifie token"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [448, 0],
+      "id": "d521116d-980b-4439-b7ec-6dc6af03a8c2",
+      "name": "Webhook - Répond challenge Meta"
+    }
+  ],
+  "connections": {
+    "Webhook - Vérification Messenger": {
+      "main": [[{ "node": "Code JS - Vérifie token", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Vérifie token": {
+      "main": [[{ "node": "Webhook - Répond challenge Meta", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

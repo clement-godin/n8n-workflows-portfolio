@@ -1,0 +1,425 @@
+{
+  "name": "EMA - AUDIT DIGITAL + ICEBREAKER",
+  "active": false,
+  "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "ema-audit",
+          "options": {},
+          "authentication": "headerAuth"
+        },
+        "id": "ddc437d7-d90f-4e83-bc3f-0e84bd627334",
+        "name": "Webhook - Audit",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          256,
+          304
+        ],
+        "webhookId": "bf4b4e70-449a-4268-a3f4-af98fc8617a3",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "G5SBA0FXpVZKTBj6",
+            "name": "n8n Internal Webhook Secret"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const rowId = $json.body?.row_id || $json.row_id;\nreturn [{json: {row_id: rowId}}];"
+        },
+        "id": "74f8e612-cd77-4f9b-8875-796fdef066a7",
+        "name": "Code - Extraire row_id",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          464,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "documentId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "REMPLACER_PAR_ID_GOOGLE_SHEET_PROSPECTS_EMAFUITES"
+          },
+          "sheetName": {
+            "__rl": true,
+            "mode": "name",
+            "value": "Prospects"
+          },
+          "options": {}
+        },
+        "id": "221f3fc5-15d7-40a5-a9ec-f0bf1432ee4a",
+        "name": "GSheets - Lire Prospect Audit",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.7,
+        "position": [
+          656,
+          304
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "rCFvQBVaQVzg9Lrq",
+            "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const rowId = $('Code - Extraire row_id').item.json.row_id;\nconst items = $input.all();\nconst found = items.find(i => i.json.ID == rowId);\nreturn found ? [{json: found.json}] : [{json: {ID: rowId, Nom: '', Entreprise: '', Poste: '', Ville: '', Site_web: '', Score: 0}}];"
+        },
+        "id": "cc853958-becb-4df0-ae0a-2c66a751b412",
+        "name": "Code - Extraire Prospect",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          864,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "={{ ($json.Site_web && $json.Site_web.trim().startsWith('http')) ? $json.Site_web : 'https://httpbin.org/status/200' }}",
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            },
+            "timeout": 5000
+          }
+        },
+        "id": "8daf55a4-0aff-4638-b310-7dc82ef09293",
+        "name": "HTTP - Vérifier Site Web",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          1056,
+          304
+        ],
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "const siteResp = $input.first().json;\nconst prospect = $('Code - Extraire Prospect').item.json;\nconst siteActif = siteResp.statusCode ? parseInt(siteResp.statusCode) < 400 : false;\nreturn [{json: {...prospect, site_actif: siteActif}}];"
+        },
+        "id": "850dc4ad-98b3-4abc-9ba1-d1c297de9726",
+        "name": "Code - Résultat Site",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1264,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpQueryAuth",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "input",
+                "value": "={{ $json.Entreprise + ' ' + $json.Ville }}"
+              },
+              {
+                "name": "inputtype",
+                "value": "textquery"
+              },
+              {
+                "name": "fields",
+                "value": "name,rating,user_ratings_total,business_status"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            },
+            "timeout": 5000
+          }
+        },
+        "id": "e4948458-43b2-47a4-aa7b-efa6548a7e9c",
+        "name": "HTTP - Google Places GMB",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          1456,
+          304
+        ],
+        "credentials": {
+          "httpQueryAuth": {
+            "id": "ZfceZKBWScM2eFGT",
+            "name": "Query Auth account"
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "jsCode": "const gmbResp = $input.first().json;\nconst codeData = $('Code - Résultat Site').item.json;\nconst siteActif = codeData.site_actif || false;\nconst prospect = codeData;\n\nlet gmbNote = null, gmbAvis = 0, gmbExiste = false;\ntry {\n  if (gmbResp.candidates && gmbResp.candidates.length > 0) {\n    const c = gmbResp.candidates[0];\n    gmbExiste = true;\n    gmbNote = c.rating || null;\n    gmbAvis = c.user_ratings_total || 0;\n  }\n} catch(e) {}\n\nconst prompt = `Tu es un expert en prospection B2B pour EMAFUITES, spécialiste de la détection de fuites d'eau non destructive dans le Nord/Hauts-de-France (interventions sans casser murs ni carrelage, résultats en 2h).\n\nGénère un icebreaker de prospection pour ce prospect. Réponds UNIQUEMENT en JSON valide sans backticks.\n\nDonnées prospect :\n- Nom : ${prospect.Nom || ''}\n- Entreprise : ${prospect.Entreprise || ''}\n- Poste : ${prospect.Poste || ''}\n- Ville : ${prospect.Ville || ''}\n\nAudit digital :\n- Site web actif : ${siteActif}\n- Fiche Google My Business : ${gmbExiste ? 'oui' : 'non/introuvable'}\n- Note GMB : ${gmbNote || 'N/A'} (${gmbAvis} avis)\n\nRègles STRICTES pour l'icebreaker :\n- Maximum 3 phrases\n- Basé sur une observation concrète de l'audit (pas de flatterie générique)\n- Centré sur le PROBLÈME du prospect (gestion des fuites, dégâts des eaux, responsabilité syndic)\n- Zéro question dans le message\n- Ton professionnel et direct, pas commercial\n- Mentionner la zone géographique si pertinent\n- Interdits : 'j'ai vu que', 'votre profil a retenu', 'en tant que', 'n'hésitez pas'\n\nRéponds : {\"icebreaker\": \"texte du message\", \"canal_recommandé\": \"email|linkedin\", \"angle\": \"explication de l'angle choisi\"}`;\n\nreturn [{json: {\n  ...prospect,\n  site_actif: siteActif,\n  gmb_note: gmbNote,\n  gmb_avis: gmbAvis,\n  gmb_existe: gmbExiste,\n  claudeBody: {model: \"claude-sonnet-4-6\", max_tokens: 1000, messages: [{role: \"user\", content: prompt}]}\n}}];"
+        },
+        "id": "f65d9817-7de0-4b14-a262-3238a41e94b5",
+        "name": "Code - Fusionner Audit",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1664,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.anthropic.com/v1/messages",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "anthropicApi",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.claudeBody) }}",
+          "options": {}
+        },
+        "id": "7f596eb0-9c70-4011-9610-9c16989e84b4",
+        "name": "Claude - Icebreaker",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          1856,
+          304
+        ],
+        "credentials": {
+          "anthropicApi": {
+            "id": "8Wcb8jgMTJM6CQjM",
+            "name": "Anthropic account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const resp = $input.first().json;\nconst orig = $('Code - Fusionner Audit').item.json;\nlet parsed;\ntry { parsed = JSON.parse(resp.content[0].text); }\ncatch(e) { parsed = {icebreaker: 'Erreur génération', 'canal_recommandé': 'email', angle: 'N/A'}; }\nreturn [{json: {...orig, icebreaker: parsed.icebreaker, canal: parsed['canal_recommandé'] || parsed.canal_recommande || 'email', angle: parsed.angle}}];"
+        },
+        "id": "f6d6e83d-f10b-4e14-86ef-3e2c5fb4f65d",
+        "name": "Code - Parser Icebreaker",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2064,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "documentId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "REMPLACER_PAR_ID_GOOGLE_SHEET_PROSPECTS_EMAFUITES"
+          },
+          "sheetName": {
+            "__rl": true,
+            "mode": "name",
+            "value": "Prospects"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "ID": "={{ $json.ID }}",
+              "Icebreaker": "={{ $json.icebreaker }}",
+              "Statut": "PRÊT_CONTACT"
+            },
+            "matchingColumns": [
+              "ID"
+            ],
+            "schema": []
+          },
+          "options": {}
+        },
+        "id": "8113812f-9cce-4331-849e-f85d2c37f4aa",
+        "name": "GSheets - Sauvegarder Icebreaker",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.7,
+        "position": [
+          2256,
+          304
+        ],
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "rCFvQBVaQVzg9Lrq",
+            "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "chatId": "YOUR_TELEGRAM_CHAT_ID",
+          "text": "=🎯 *Nouveau prospect prêt*\n\n*{{ $json.Nom }}* — {{ $json.Entreprise }}\nPoste : {{ $json.Poste }} | Score : {{ $json.Score }}/100\nCanal : {{ $json.canal }}\n\n📝 *Icebreaker :*\n{{ $json.icebreaker }}\n\n_Angle : {{ $json.angle }}_",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "19a37f30-39bb-4d80-a2ad-1dfecce624b8",
+        "name": "Telegram - Prospect Prêt",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2464,
+          304
+        ],
+        "webhookId": "bb7e9a4d-1862-4d74-9395-2718856e435f",
+        "credentials": {
+          "telegramApi": {
+            "id": "RaG5QR5En7OmVEPM",
+            "name": "scoring_lead_auto_bot"
+          }
+        }
+      }
+  ],
+  "connections": {
+      "Webhook - Audit": {
+        "main": [
+          [
+            {
+              "node": "Code - Extraire row_id",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Extraire row_id": {
+        "main": [
+          [
+            {
+              "node": "GSheets - Lire Prospect Audit",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GSheets - Lire Prospect Audit": {
+        "main": [
+          [
+            {
+              "node": "Code - Extraire Prospect",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Extraire Prospect": {
+        "main": [
+          [
+            {
+              "node": "HTTP - Vérifier Site Web",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP - Vérifier Site Web": {
+        "main": [
+          [
+            {
+              "node": "Code - Résultat Site",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Résultat Site": {
+        "main": [
+          [
+            {
+              "node": "HTTP - Google Places GMB",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP - Google Places GMB": {
+        "main": [
+          [
+            {
+              "node": "Code - Fusionner Audit",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Fusionner Audit": {
+        "main": [
+          [
+            {
+              "node": "Claude - Icebreaker",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude - Icebreaker": {
+        "main": [
+          [
+            {
+              "node": "Code - Parser Icebreaker",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Parser Icebreaker": {
+        "main": [
+          [
+            {
+              "node": "GSheets - Sauvegarder Icebreaker",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GSheets - Sauvegarder Icebreaker": {
+        "main": [
+          [
+            {
+              "node": "Telegram - Prospect Prêt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+  },
+  "settings": {
+      "saveManualExecutions": true,
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false,
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "timeSavedMode": "fixed",
+      "errorWorkflow": "wg0YurkUmY4jQap6"
+  }
+}

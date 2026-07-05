@@ -1,0 +1,591 @@
+{
+  "name": "BOT TELEGRAM ASSISTANT REDACTION RAPPORT",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message", "callback_query"],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 1120],
+      "id": "884c0a70-ab77-4b61-bfa0-cad3caf8d114",
+      "name": "Trigger - Bot rédaction rapport",
+      "webhookId": "ce9a4f5b-40ee-42a7-8ecc-9589b9a3e18f",
+      "credentials": {
+        "telegramApi": {
+          "id": "LOf1IUtLQNNH4QGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "text"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6a36ee72-1160-4605-aba5-d2cb6b908b06",
+                    "leftValue": "={{ $json.message.voice }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0b4092e4-2bc7-421d-a30d-0f3971792309",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "valider_audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio OK"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6d9fcefa-dc4e-4615-9253-fe9d808e5caa",
+                    "leftValue": "={{ $json.callback_query.data }}",
+                    "rightValue": "annuler_audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio pas OK"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [224, 1088],
+      "id": "e43a4256-528b-4931-b607-866ee9713d98",
+      "name": "Switch - Type message bot"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-6",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [448, 272],
+      "id": "910722d0-7e39-49d3-a508-7ba532d1365f",
+      "name": "Claude - Modèle agent texte",
+      "credentials": {
+        "anthropicApi": {
+          "id": "8Wcb8jgMTJM6CQjM",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [1104, 864],
+      "id": "bad3367a-0e51-45f5-a63b-bbfaefad2c09",
+      "name": "OpenAI - Transcrit vocal",
+      "credentials": {
+        "openAiApi": {
+          "id": "9LS6CDaep0lZZnNq",
+          "name": "OpenAi perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('Trigger - Bot rédaction rapport').item.json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [672, 864],
+      "id": "621f0444-3fe4-4f8a-975c-c93de1d6b1af",
+      "name": "Telegram - Récupère vocal",
+      "webhookId": "e1c7d13f-4da7-4db3-848c-d27bd77904d4",
+      "credentials": {
+        "telegramApi": {
+          "id": "LOf1IUtLQNNH4QGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Bot rédaction rapport').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1104, 368],
+      "id": "9ad08b58-aaf4-41a8-9269-49e1237121ef",
+      "name": "Telegram - Répond agent texte",
+      "webhookId": "02df908e-7006-4ab1-92b7-35de016eb9aa",
+      "credentials": {
+        "telegramApi": {
+          "id": "LOf1IUtLQNNH4QGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Bot rédaction rapport').item.json.message.chat.id }}",
+        "text": "=Voici ce que j'ai compris : {{ $json.text }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Valider",
+                    "additionalFields": { "callback_data": "valider_audio" }
+                  },
+                  {
+                    "text": "Recommencer",
+                    "additionalFields": { "callback_data": "annuler_audio" }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1328, 864],
+      "id": "e1d4f0ac-0bdf-4984-90f2-fc7c108b7dc4",
+      "name": "Telegram - Propose transcription",
+      "webhookId": "4488de6e-d295-4619-bbab-dfd73a2ecc74",
+      "credentials": {
+        "telegramApi": {
+          "id": "LOf1IUtLQNNH4QGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Bot rédaction rapport').item.json.callback_query.message.chat.id }}",
+        "text": "=Ok, j'annule. Envoie-moi un nouveau vocal !",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [672, 1872],
+      "id": "dd5623e5-ac6b-4c2b-ae7c-a01b39279708",
+      "name": "Telegram - Annule vocal",
+      "webhookId": "4488de6e-d295-4619-bbab-dfd73a2ecc74",
+      "credentials": {
+        "telegramApi": {
+          "id": "LOf1IUtLQNNH4QGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "Rôle :\nTu es l'ingénieur assistant de rédaction pour MEA-Tech, spécialisé en rapports d'expertise de recherche de fuites. Ton objectif est de transformer les notes de terrain du technicien en paragraphes techniques professionnels en consultant la base de données.\n\nInstructions de Recherche (RAG) :\n\nPour chaque requête technique (ex: \"fuite velux\", \"test pression\"), utilise systématiquement l'outil recherche_archives_mea\n\nAnalyse les résultats renvoyés par l'outil. Chaque résultat est un \"Super-Chunk\" contenant :\n\nCONCLUSION DU RAPPORT (La cause finale).\n\nCONTEXTE ET CONSTATATIONS (Les dommages observés).\n\nDÉTAIL DE L'INVESTIGATION (La méthode et le résultat précis).\n\nRègles Anti-Hallucination Strictes :\n\nSource unique : Ne rédige jamais une conclusion ou une méthode que tu n'as pas trouvée dans la base de données ou fournie par le technicien.\n\nHonnêteté technique : Si la base de données ne contient aucun cas similaire à la demande, réponds : \"Je n'ai pas trouvé de cas similaire dans nos archives pour ce type de fuite. Voici une ébauche basée uniquement sur vos notes...\".\n\nDonnées chiffrées : Ne modifie jamais les valeurs techniques (bars, taux d'humidité, durée) trouvées dans les exemples sans instructions explicites.\n\nFormat de Rédaction (Style MEA) :\n\nUtilise la nomenclature exacte : Investigation X - [Nom de la méthode] : Conclusion : [Résultat technique].\n\nSois concis et factuel. Emploie le vocabulaire métier présent dans la base : \"manomètre en circuit fermé\", \"colorant Luminate\", \"écoute acoustique\", \"remaniement de tuiles\"."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [512, 48],
+      "id": "784beb15-fb79-46ba-ba03-b656660b7c3a",
+      "name": "Agent - Rédaction MEA (texte)"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [688, 688],
+      "id": "64dbb468-a91c-476b-acc8-1b7dbb2005ee",
+      "name": "OpenAI - Embeddings (texte)",
+      "credentials": {
+        "openAiApi": {
+          "id": "9LS6CDaep0lZZnNq",
+          "name": "OpenAi perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "n8n-rapport-fuite",
+          "mode": "list",
+          "cachedResultName": "n8n-rapport-fuite"
+        },
+        "options": {
+          "pineconeNamespace": "={{ 'expertises-mea-fuite' }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [608, 480],
+      "id": "d39bd1d1-6c1c-417f-ac63-f78e768a1710",
+      "name": "Pinecone - Archives (texte)",
+      "credentials": {
+        "pineconeApi": {
+          "id": "XXjUj5PLNb97FQba",
+          "name": "PineconeApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-6",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [896, 480],
+      "id": "228b76df-994b-4760-b75b-401897196328",
+      "name": "Claude - Outil RAG texte",
+      "credentials": {
+        "anthropicApi": {
+          "id": "8Wcb8jgMTJM6CQjM",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Outil indispensable. Utilise cette base de données pour rechercher les anciens rapports d'expertise de recherche de fuites. Tu y trouveras des 'Super-Chunks' contenant la conclusion, les désordres constatés et le détail des investigations techniques. Cherche via des mots-clés (ex: 'velux', 'pression', 'colorant').",
+        "topK": 5
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [704, 272],
+      "id": "49deaa08-e8a7-4b4e-a5b9-37434c8ca6a6",
+      "name": "recherche_archives_mea"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Bot rédaction rapport').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1104, 1376],
+      "id": "340ba3e2-fe70-4e70-bae3-7b4a21813346",
+      "name": "Telegram - Répond agent audio",
+      "webhookId": "02df908e-7006-4ab1-92b7-35de016eb9aa",
+      "credentials": {
+        "telegramApi": {
+          "id": "LOf1IUtLQNNH4QGa",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "Rôle :\nTu es l'ingénieur assistant de rédaction pour MEA-Tech, spécialisé en rapports d'expertise de recherche de fuites. Ton objectif est de transformer les notes de terrain du technicien en paragraphes techniques professionnels en consultant la base de données.\n\nInstructions de Recherche (RAG) :\n\nPour chaque requête technique (ex: \"fuite velux\", \"test pression\"), utilise systématiquement l'outil recherche_archives_mea\n\nAnalyse les résultats renvoyés par l'outil. Chaque résultat est un \"Super-Chunk\" contenant :\n\nCONCLUSION DU RAPPORT (La cause finale).\n\nCONTEXTE ET CONSTATATIONS (Les dommages observés).\n\nDÉTAIL DE L'INVESTIGATION (La méthode et le résultat précis).\n\nRègles Anti-Hallucination Strictes :\n\nSource unique : Ne rédige jamais une conclusion ou une méthode que tu n'as pas trouvée dans la base de données ou fournie par le technicien.\n\nHonnêteté technique : Si la base de données ne contient aucun cas similaire à la demande, réponds : \"Je n'ai pas trouvé de cas similaire dans nos archives pour ce type de fuite. Voici une ébauche basée uniquement sur vos notes...\".\n\nDonnées chiffrées : Ne modifie jamais les valeurs techniques (bars, taux d'humidité, durée) trouvées dans les exemples sans instructions explicites.\n\nFormat de Rédaction (Style MEA) :\n\nUtilise la nomenclature exacte : Investigation X - [Nom de la méthode] : Conclusion : [Résultat technique].\n\nSois concis et factuel. Emploie le vocabulaire métier présent dans la base : \"manomètre en circuit fermé\", \"colorant Luminate\", \"écoute acoustique\", \"remaniement de tuiles\"."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [512, 1056],
+      "id": "421d8504-acd6-45e3-8239-521978710cd1",
+      "name": "Agent - Rédaction MEA (audio)"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [688, 1696],
+      "id": "3ee19844-0581-4f97-a7bc-ca0fb345051c",
+      "name": "OpenAI - Embeddings (audio)",
+      "credentials": {
+        "openAiApi": {
+          "id": "9LS6CDaep0lZZnNq",
+          "name": "OpenAi perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "n8n-rapport-fuite",
+          "mode": "list",
+          "cachedResultName": "n8n-rapport-fuite"
+        },
+        "options": {
+          "pineconeNamespace": "={{ 'expertises-mea-fuite' }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [608, 1488],
+      "id": "56c5b539-b31c-4211-a385-b46970df4596",
+      "name": "Pinecone - Archives (audio)",
+      "credentials": {
+        "pineconeApi": {
+          "id": "XXjUj5PLNb97FQba",
+          "name": "PineconeApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-6",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [896, 1488],
+      "id": "da5cd42a-c23e-4ba2-9a83-e31db87b7d2c",
+      "name": "Claude - Outil RAG audio",
+      "credentials": {
+        "anthropicApi": {
+          "id": "8Wcb8jgMTJM6CQjM",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Outil indispensable. Utilise cette base de données pour rechercher les anciens rapports d'expertise de recherche de fuites. Tu y trouveras des 'Super-Chunks' contenant la conclusion, les désordres constatés et le détail des investigations techniques. Cherche via des mots-clés (ex: 'velux', 'pression', 'colorant').",
+        "topK": 5
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [704, 1280],
+      "id": "5f2a57be-ced2-439b-b511-f81fa6a5324d",
+      "name": "recherche_archives_mea1"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Trigger - Bot rédaction rapport').first().json.message.chat.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [576, 1280],
+      "id": "f25b5ace-67d2-45ef-a582-ef9d1c20a946",
+      "name": "Mémoire - Session audio"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-6",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [448, 1280],
+      "id": "04850dad-d49f-459a-b0d8-d3bed68c0e44",
+      "name": "Claude - Modèle agent audio",
+      "credentials": {
+        "anthropicApi": {
+          "id": "8Wcb8jgMTJM6CQjM",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Trigger - Bot rédaction rapport').first().json.message.chat.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [576, 272],
+      "id": "eca4aa50-d419-43d8-912d-2e70a77beace",
+      "name": "Mémoire - Session texte"
+    }
+  ],
+  "connections": {
+    "Trigger - Bot rédaction rapport": {
+      "main": [[{ "node": "Switch - Type message bot", "type": "main", "index": 0 }]]
+    },
+    "Claude - Modèle agent texte": {
+      "ai_languageModel": [[{ "node": "Agent - Rédaction MEA (texte)", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Switch - Type message bot": {
+      "main": [
+        [{ "node": "Agent - Rédaction MEA (texte)", "type": "main", "index": 0 }],
+        [{ "node": "Telegram - Récupère vocal", "type": "main", "index": 0 }],
+        [{ "node": "Agent - Rédaction MEA (audio)", "type": "main", "index": 0 }],
+        [{ "node": "Telegram - Annule vocal", "type": "main", "index": 0 }]
+      ]
+    },
+    "Telegram - Récupère vocal": {
+      "main": [[{ "node": "OpenAI - Transcrit vocal", "type": "main", "index": 0 }]]
+    },
+    "OpenAI - Transcrit vocal": {
+      "main": [[{ "node": "Telegram - Propose transcription", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Propose transcription": {
+      "main": [[]]
+    },
+    "Agent - Rédaction MEA (texte)": {
+      "main": [[{ "node": "Telegram - Répond agent texte", "type": "main", "index": 0 }]]
+    },
+    "OpenAI - Embeddings (texte)": {
+      "ai_embedding": [[{ "node": "Pinecone - Archives (texte)", "type": "ai_embedding", "index": 0 }]]
+    },
+    "Pinecone - Archives (texte)": {
+      "ai_vectorStore": [[{ "node": "recherche_archives_mea", "type": "ai_vectorStore", "index": 0 }]]
+    },
+    "Claude - Outil RAG texte": {
+      "ai_languageModel": [[{ "node": "recherche_archives_mea", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "recherche_archives_mea": {
+      "ai_tool": [[{ "node": "Agent - Rédaction MEA (texte)", "type": "ai_tool", "index": 0 }]]
+    },
+    "Agent - Rédaction MEA (audio)": {
+      "main": [[{ "node": "Telegram - Répond agent audio", "type": "main", "index": 0 }]]
+    },
+    "OpenAI - Embeddings (audio)": {
+      "ai_embedding": [[{ "node": "Pinecone - Archives (audio)", "type": "ai_embedding", "index": 0 }]]
+    },
+    "Pinecone - Archives (audio)": {
+      "ai_vectorStore": [[{ "node": "recherche_archives_mea1", "type": "ai_vectorStore", "index": 0 }]]
+    },
+    "Claude - Outil RAG audio": {
+      "ai_languageModel": [[{ "node": "recherche_archives_mea1", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "recherche_archives_mea1": {
+      "ai_tool": [[{ "node": "Agent - Rédaction MEA (audio)", "type": "ai_tool", "index": 0 }]]
+    },
+    "Mémoire - Session audio": {
+      "ai_memory": [[{ "node": "Agent - Rédaction MEA (audio)", "type": "ai_memory", "index": 0 }]]
+    },
+    "Claude - Modèle agent audio": {
+      "ai_languageModel": [[{ "node": "Agent - Rédaction MEA (audio)", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Mémoire - Session texte": {
+      "ai_memory": [[{ "node": "Agent - Rédaction MEA (texte)", "type": "ai_memory", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["BOT TELEGRAM", "CHAT BOT"]
+}

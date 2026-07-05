@@ -1,0 +1,479 @@
+{
+  "name": "OPTIMISATION PROMPT TRI GMAIL COMPTE PERSO",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "weeks", "triggerAtDay": [1], "triggerAtHour": 9 }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [592, 784],
+      "id": "bf3dff8b-8f8b-4454-8569-5b5c6a16e834",
+      "name": "Trigger - Optim prompt lundi"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1683212892,
+          "mode": "list",
+          "cachedResultName": "prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1683212892"
+        },
+        "filtersUI": { "values": [{ "lookupColumn": "Actif", "lookupValue": "OUI" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [816, 784],
+      "id": "b7f764ff-9154-4b99-bced-40c1cc673fce",
+      "name": "Google Sheets - Prompt Actif",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "classifications",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "filtersUI": { "values": [{ "lookupColumn": "ANALYSER ?", "lookupValue": "NON" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1040, 784],
+      "id": "952066b9-f3b2-488d-9573-59dbff3f4a38",
+      "name": "Google Sheets - Classifications à analyser",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prompt = $('Google Sheets - Prompt Actif').first().json;\nconst rows   = $('Google Sheets - Classifications à analyser').all();\n\nconst total     = rows.length;\nconst erronees  = rows.filter(r => (r.json['correct'] || r.json['correct '] || '').trim() === 'non');\nconst incertain = rows.filter(r => (r.json['correct'] || r.json['correct '] || '').trim() === '?');\nconst correctes = rows.filter(r => (r.json['correct'] || r.json['correct '] || '').trim() === 'oui');\n\nconst tauxErreur = total > 0 ? ((erronees.length / total) * 100).toFixed(1) : 0;\n\nconst erreursByCategorie = {};\nfor (const r of erronees) {\n  const cat = r.json.categorie_attribuee;\n  if (!erreursByCategorie[cat]) erreursByCategorie[cat] = [];\n  erreursByCategorie[cat].push({\n    sujet:       r.json.sujet,\n    corps:       r.json.corps_resume,\n    commentaire: r.json.commentaire\n  });\n}\n\nconst exemplesErreurs = erronees.slice(0, 10).map(r => ({\n  sujet:               r.json.sujet,\n  corps:               r.json.corps_resume,\n  categorie_attribuee: r.json.categorie_attribuee,\n  commentaire:         r.json.commentaire\n}));\n\nconst rowNumbers = rows.map(r => r.json.row_number).filter(Boolean);\n\nreturn [{\n  json: {\n    prompt_actuel:    prompt.Prompt,\n    prompt_version:   prompt.Version || 'v1',\n    row_number_prompt: prompt.row_number,\n    total,\n    nb_correctes:     correctes.length,\n    nb_erronees:      erronees.length,\n    nb_incertain:     incertain.length,\n    taux_erreur:      tauxErreur,\n    erreurs_by_cat:   erreursByCategorie,\n    exemples_erreurs: exemplesErreurs,\n    row_numbers:      rowNumbers\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1264, 784],
+      "id": "776fa5ba-6642-4824-a109-cb6fa6cd5ba2",
+      "name": "Code JS - Calcule statistiques"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1712, 784],
+      "id": "77d88430-6905-459d-9e25-ae32bcebb65a",
+      "name": "API DeepSeek - Analyse prompt",
+      "credentials": {
+        "deepSeekApi": { "id": "MBt6ozX97KVIAwcD", "name": "DeepSeek account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw     = $input.first().json.choices[0].message.content\n  .trim()\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/i, '')\n  .replace(/```\\s*$/i, '');\n\nconst rapport = $('Code JS - Calcule statistiques').first().json;\n\nlet analyse;\ntry {\n  analyse = JSON.parse(raw);\n} catch(e) {\n  analyse = {\n    modification_necessaire: false,\n    analyse: 'Erreur de parsing — vérification manuelle requise',\n    problemes: [],\n    prompt_modifie: '',\n    diff: [],\n    confiance: 'faible'\n  };\n}\n\n// Ajoute ces lignes avant le return\nconst staticData = $getWorkflowStaticData('global');\nstaticData.row_numbers = rapport.row_numbers || [];\n\nreturn [{\n  json: {\n    ...analyse,\n    prompt_actuel:      rapport.prompt_actuel,\n    prompt_version:     rapport.prompt_version,\n    row_number_prompt:  rapport.row_number_prompt,\n    row_numbers:        rapport.row_numbers,\n    stats: {\n      total:       rapport.total,\n      taux_erreur: rapport.taux_erreur\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1936, 784],
+      "id": "ae15611d-a595-459c-b04c-2977f0bf8ded",
+      "name": "Code JS - Parse analyse DeepSeek"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3 },
+          "conditions": [
+            {
+              "id": "3cf214ca-6bae-4345-af22-7503fabfb9d5",
+              "leftValue": "={{ $json.modification_necessaire }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2160, 784],
+      "id": "bef79642-d90e-4ecd-a316-3636f0413e51",
+      "name": "Si - Modification nécessaire ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\n// Persistance pour le callback Telegram\nconst staticData = $getWorkflowStaticData('global');\nstaticData.prompt_modifie  = d.prompt_modifie;\nstaticData.prompt_version  = d.prompt_version;\nstaticData.row_number      = d.row_number_prompt;\nstaticData.row_numbers     = d.row_numbers;\n\nconst problemes = (d.problemes || []).map((p, i) => `${i+1}. ${p}`).join('\\n');\nconst diffs     = (d.diff || []).map((diff, i) => `${i+1}. ${diff}`).join('\\n');\n\nconst semaine = $now.minus({days: 7}).toFormat('dd/MM');\n\nconst message =\n`🔍 <b>Analyse prompt classif — semaine du ${semaine}</b>\\n\\n` +\n`📊 <b>Stats</b>\\n` +\n`Taux d'erreur : ${d.stats.taux_erreur}% sur ${d.stats.total} emails\\n\\n` +\n`⚠️ <b>Problèmes détectés</b>\\n${problemes}\\n\\n` +\n`✏️ <b>Modifications proposées</b>\\n${diffs}\\n\\n` +\n`🎯 Confiance de l'analyse : ${d.confiance}\\n\\n` +\n`<b>Valider la mise à jour du prompt ?</b>`;\n\nreturn [{ json: { message, prompt_modifie: d.prompt_modifie, row_numbers: d.row_numbers } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2384, 688],
+      "id": "26a5640b-4bb3-49ed-9eac-3e4b0b4378e4",
+      "name": "Code JS - Formate message Telegram"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  { "text": "✅ Oui, mettre à jour", "additionalFields": { "callback_data": "modif_ok" } },
+                  { "text": "❌ Non, garder l'actuel", "additionalFields": { "callback_data": "modif_refuser" } }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": { "appendAttribution": false, "parse_mode": "HTML" }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2608, 688],
+      "id": "aacf41a6-109b-45ee-ad6b-031cdb3ea245",
+      "name": "Telegram - Propose nouveau prompt",
+      "credentials": {
+        "telegramApi": { "id": "zteuycKXeHxzAROh", "name": "notif_erreur_workflow_n8n_bot" }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=✅ <b>Prompt OK</b> — taux d'erreur {{ $json.stats.taux_erreur }}% cette semaine, aucune modification nécessaire.",
+        "additionalFields": { "appendAttribution": false, "parse_mode": "HTML" }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2608, 880],
+      "id": "051ca10e-194f-4033-877a-d943ba521a82",
+      "name": "Telegram - Prompt OK",
+      "credentials": {
+        "telegramApi": { "id": "zteuycKXeHxzAROh", "name": "notif_erreur_workflow_n8n_bot" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst rowNumbers = staticData.row_numbers || [];\n\nreturn rowNumbers.map(function(n) {\n  return { json: { row_number: n } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2832, 784],
+      "id": "46f841e2-ccdc-4d02-b4ef-41a2dc30579c",
+      "name": "Code JS - Prépare marquage classifications"
+    },
+    {
+      "parameters": { "options": {} },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [3056, 784],
+      "id": "ef4e7da6-43a6-4f20-9485-2a76a38e6a4f",
+      "name": "Boucle - Marquage classifications"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "classifications",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": { "ANALYSER ?": "OUI", "row_number": "={{ $json.row_number }}" },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            { "id": "ANALYSER ?", "displayName": "ANALYSER ?", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "row_number", "displayName": "row_number", "required": false, "defaultMatch": true, "display": true, "type": "number", "canBeUsedToMatch": true, "readOnly": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [3280, 784],
+      "id": "28d6585b-bc90-45d4-ac0f-e22571cc4e15",
+      "name": "Google Sheets - Marque classification analysée",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": { "updates": ["callback_query"], "additionalFields": {} },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [592, 1104],
+      "id": "952f86f0-0de2-427f-8bd1-4b8e45bc0d61",
+      "name": "Trigger - Validation prompt Telegram",
+      "credentials": {
+        "telegramApi": { "id": "zteuycKXeHxzAROh", "name": "notif_erreur_workflow_n8n_bot" }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "queryId": "={{ $json.callback_query.id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [816, 1104],
+      "id": "e720eae5-b417-47e5-a6b4-33d96343edac",
+      "name": "Telegram - Répond callback",
+      "credentials": {
+        "telegramApi": { "id": "zteuycKXeHxzAROh", "name": "notif_erreur_workflow_n8n_bot" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data       = $input.first().json.callback_query.data;\nconst staticData = $getWorkflowStaticData('global');\n\nreturn [{\n  json: {\n    valide:         data === 'modif_ok',\n    prompt_modifie: staticData.prompt_modifie || '',\n    prompt_version: staticData.prompt_version || 'v1',\n    row_number:     staticData.row_number || ''\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 1104],
+      "id": "770a3136-32e4-471e-8438-34e30fda863d",
+      "name": "Code JS - Parse callback"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 3 },
+          "conditions": [
+            {
+              "id": "2bec6448-20e1-4ec8-a38b-becb05709a13",
+              "leftValue": "={{ $json.valide }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1264, 1104],
+      "id": "e8b95baa-762d-4f67-92eb-4793c23e9855",
+      "name": "Si - Validé par Clément ?"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1683212892,
+          "mode": "list",
+          "cachedResultName": "prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1683212892"
+        },
+        "filtersUI": { "values": [{ "lookupColumn": "Actif", "lookupValue": "OUI" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1488, 1104],
+      "id": "5a7bd293-1181-401c-80a4-cd403e13b0c7",
+      "name": "Google Sheets - Récupère prompt actif",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1683212892,
+          "mode": "list",
+          "cachedResultName": "prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1683212892"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Actif": "NON",
+            "nb erreur détectées": "={{ $('Code JS - Calcule statistiques').first().json.nb_erronees }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            { "id": "Version", "displayName": "Version", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Date creation", "displayName": "Date creation", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Actif", "displayName": "Actif", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "nb erreur détectées", "displayName": "nb erreur détectées", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Prompt", "displayName": "Prompt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "row_number", "displayName": "row_number", "required": false, "defaultMatch": true, "display": true, "type": "number", "canBeUsedToMatch": true, "readOnly": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1712, 1104],
+      "id": "11992ec8-3ca3-40d8-883f-b75f2ebaaf2f",
+      "name": "Google Sheets - Désactive ancien prompt",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1683212892,
+          "mode": "list",
+          "cachedResultName": "prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1683212892"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Actif": "OUI",
+            "Date creation": "={{ $now.toFormat('yyyy-MM-dd') }}",
+            "Prompt": "={{ $('Code JS - Parse callback').first().json.prompt_modifie }}",
+            "Version": "={{ 'v' + String(parseInt(($('Google Sheets - Récupère prompt actif').first().json.Version || 'v1').replace('v','')) + 1) }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            { "id": "Version", "displayName": "Version", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Date creation", "displayName": "Date creation", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Actif", "displayName": "Actif", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Prompt", "displayName": "Prompt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1936, 1104],
+      "id": "3dc9916f-6db6-410c-94e4-a17cc8bc45e7",
+      "name": "Google Sheets - Insère nouveau prompt",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nconst body = {\n  model: \"deepseek-v4-flash\",\n  temperature: 0.3,\n  messages: [\n    {\n      role: \"system\",\n      content: \"Tu es un expert en prompt engineering et classification d'emails. Tu analyses les résultats de classification d'une semaine, identifies les patterns d'erreurs, et proposes des améliorations précises au prompt de classification. Tu réponds UNIQUEMENT en JSON valide sans backticks ni texte autour.\"\n    },\n    {\n      role: \"user\",\n      content: \"Voici le rapport de classification de la semaine :\\n\\nPROMPT ACTUEL (\" + d.prompt_version + \") :\\n\" + d.prompt_actuel + \"\\n\\nSTATISTIQUES :\\n- Total emails classifiés : \" + d.total + \"\\n- Corrects : \" + d.nb_correctes + \"\\n- Erreurs confirmées : \" + d.nb_erronees + \"\\n- Incertains : \" + d.nb_incertain + \"\\n- Taux d'erreur : \" + d.taux_erreur + \"%\\n\\nERREURS PAR CATÉGORIE :\\n\" + JSON.stringify(d.erreurs_by_cat, null, 2) + \"\\n\\nEXEMPLES D'ERREURS :\\n\" + JSON.stringify(d.exemples_erreurs, null, 2) + \"\\n\\nRéponds avec ce JSON :\\n{\\\"modification_necessaire\\\": true/false,\\\"analyse\\\": \\\"résumé des problèmes détectés en 3-4 phrases\\\",\\\"problemes\\\": [\\\"problème 1\\\"],\\\"prompt_modifie\\\": \\\"le prompt complet réécrit\\\",\\\"diff\\\": [\\\"modification 1\\\"],\\\"confiance\\\": \\\"haute/moyenne/faible\\\"}\"\n    }\n  ]\n};\n\nreturn [{ json: { ...d, requestBody: JSON.stringify(body) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1488, 784],
+      "id": "b0112a79-af36-4646-9080-e55271e795f3",
+      "name": "Code JS - Prépare body DeepSeek"
+    }
+  ],
+  "connections": {
+    "Trigger - Optim prompt lundi": { "main": [[{ "node": "Google Sheets - Prompt Actif", "type": "main", "index": 0 }]] },
+    "Google Sheets - Prompt Actif": { "main": [[{ "node": "Google Sheets - Classifications à analyser", "type": "main", "index": 0 }]] },
+    "Google Sheets - Classifications à analyser": { "main": [[{ "node": "Code JS - Calcule statistiques", "type": "main", "index": 0 }]] },
+    "Code JS - Calcule statistiques": { "main": [[{ "node": "Code JS - Prépare body DeepSeek", "type": "main", "index": 0 }]] },
+    "API DeepSeek - Analyse prompt": { "main": [[{ "node": "Code JS - Parse analyse DeepSeek", "type": "main", "index": 0 }]] },
+    "Code JS - Parse analyse DeepSeek": { "main": [[{ "node": "Si - Modification nécessaire ?", "type": "main", "index": 0 }]] },
+    "Si - Modification nécessaire ?": {
+      "main": [
+        [{ "node": "Code JS - Formate message Telegram", "type": "main", "index": 0 }],
+        [{ "node": "Telegram - Prompt OK", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code JS - Formate message Telegram": { "main": [[{ "node": "Telegram - Propose nouveau prompt", "type": "main", "index": 0 }]] },
+    "Telegram - Propose nouveau prompt": { "main": [[{ "node": "Code JS - Prépare marquage classifications", "type": "main", "index": 0 }]] },
+    "Telegram - Prompt OK": { "main": [[{ "node": "Code JS - Prépare marquage classifications", "type": "main", "index": 0 }]] },
+    "Code JS - Prépare marquage classifications": { "main": [[{ "node": "Boucle - Marquage classifications", "type": "main", "index": 0 }]] },
+    "Boucle - Marquage classifications": {
+      "main": [[], [{ "node": "Google Sheets - Marque classification analysée", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets - Marque classification analysée": { "main": [[{ "node": "Boucle - Marquage classifications", "type": "main", "index": 0 }]] },
+    "Trigger - Validation prompt Telegram": { "main": [[{ "node": "Telegram - Répond callback", "type": "main", "index": 0 }]] },
+    "Telegram - Répond callback": { "main": [[{ "node": "Code JS - Parse callback", "type": "main", "index": 0 }]] },
+    "Code JS - Parse callback": { "main": [[{ "node": "Si - Validé par Clément ?", "type": "main", "index": 0 }]] },
+    "Si - Validé par Clément ?": { "main": [[{ "node": "Google Sheets - Récupère prompt actif", "type": "main", "index": 0 }]] },
+    "Google Sheets - Récupère prompt actif": { "main": [[{ "node": "Google Sheets - Désactive ancien prompt", "type": "main", "index": 0 }]] },
+    "Google Sheets - Désactive ancien prompt": { "main": [[{ "node": "Google Sheets - Insère nouveau prompt", "type": "main", "index": 0 }]] },
+    "Code JS - Prépare body DeepSeek": { "main": [[{ "node": "API DeepSeek - Analyse prompt", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["TRI GMAIL", "COMPTE PERSO"]
+}

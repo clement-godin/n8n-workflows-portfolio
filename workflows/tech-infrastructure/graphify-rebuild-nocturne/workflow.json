@@ -1,0 +1,90 @@
+{
+  "name": "GRAPHIFY REBUILD NOCTURNE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "5d14aa83-3902-4cf0-a131-b935449f80c2",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json.stdout || '';\nconst stderr = $input.first().json.stderr || '';\nconst success = !stderr.includes('error') && output.includes('terminée');\n\n// Nettoyer les caractères spéciaux\nconst cleanStderr = stderr.replace(/[<>&\"'*_`\\[\\]()]/g, ' ').slice(-200);\n\nreturn [{ json: {\n  status: success ? '✅ OK' : '⚠️ Vérifier',\n  output: output.slice(-500),\n  stderr: cleanStderr\n}}];"
+      },
+      "id": "9b215f64-5e08-4799-b0e6-bddb5672805b",
+      "name": "Evaluer Resultat",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [448, 0]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🕸️ Graphify Rebuild Nocturne\n{{ $json.status }} \nema-fuites/app\n🕐 {{ $now.toFormat('dd/MM HH:mm') }}\n{{ $json.stderr ? '⚠️ ' + $json.stderr : '' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "b519b45c-b745-42f0-b276-463629b4c53c",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [672, 0],
+      "webhookId": "dc4aca07-d7b8-450e-8b96-b46a54d6b623",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "bash /home/debian/scripts/graphify-rebuild.sh"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [224, 0],
+      "id": "7325a137-d614-4b7a-8af6-ad27a562013f",
+      "name": "Execute a command",
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "bt56RSR5H3bzgKsg",
+          "name": "SSH Private Key account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "Execute a command", "type": "main", "index": 0 }]]
+    },
+    "Evaluer Resultat": {
+      "main": [[{ "node": "Telegram", "type": "main", "index": 0 }]]
+    },
+    "Execute a command": {
+      "main": [[{ "node": "Evaluer Resultat", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

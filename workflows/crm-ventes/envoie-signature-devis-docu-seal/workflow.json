@@ -1,0 +1,278 @@
+{
+  "name": "ENVOIE SIGNATURE DEVIS DOCU SEAL",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "search",
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "propertyName": "dealstage",
+                    "value": "3422434021"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [224, 0],
+      "id": "ac8e9fc8-7cae-4fa6-8571-a59e24cd599c",
+      "name": "HubSpot - Cherche deals à signer",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hubapi.com/files/v3/files/{{ $json.attachments[0].id }}/signed-url",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1120, 0],
+      "id": "75a5871e-7f47-4570-9605-189897577333",
+      "name": "API HubSpot - URL fichier signé",
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "get",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [448, 0],
+      "id": "e4536087-5404-49c5-8d92-91f27bcff669",
+      "name": "HubSpot - Récupère deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "engagement",
+        "operation": "get",
+        "engagementId": {
+          "__rl": true,
+          "value": "={{ $('HubSpot - Récupère deal').item.json.properties.hs_notes_last_activity.value.split('-').pop() }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [896, 0],
+      "id": "1009d7cf-1994-4615-a3ed-95d0000f2e2b",
+      "name": "HubSpot - Récupère engagement",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path-uuid",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "e7d33d3f-6732-44f6-aa57-5004c1cd839e",
+      "name": "Webhook - Demande signature devis",
+      "webhookId": "your-webhook-path-uuid",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.signatureapi.com/v1/envelopes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "YOUR_SIGNATUREAPI_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"Devis EMA Fuites - {{ $('HubSpot - Récupère contact').item.json.properties.lastname.value }}\",\n  \"subject\": \"Votre devis EMA Fuites pour signature\",\n  \"message\": \"Bonjour {{ $('HubSpot - Récupère contact').item.json.properties.firstname.value }},\\n\\nVeuillez trouver ci-joint votre devis EMA Fuites. Vous pouvez le signer électroniquement en cliquant sur le bouton ci-dessous.\\n\\nCordialement,\\nClément - EMA Fuites\",\n  \"metadata\": {\n    \"hubspot_deal_id\": \"{{ $('HubSpot - Récupère contact').item.json.properties.hs_object_id.value }}\"\n  },\n  \"documents\": [\n    {\n      \"key\": \"devis\",\n      \"url\": \"{{ $('Drive - Uploade PDF').item.json.webContentLink }}\",\n      \"places\": [\n        {\n          \"key\": \"signature\",\n          \"type\": \"signature\",\n          \"recipient_key\": \"client1\"\n        }\n      ]\n    }\n  ],\n  \"recipients\": [\n    {\n      \"key\": \"client1\",\n      \"type\": \"signer\",\n      \"delivery_type\": \"email\",\n      \"name\": \"{{ $('HubSpot - Récupère contact').item.json.properties.firstname.value }} {{ $('HubSpot - Récupère contact').item.json.properties.lastname.value }}\",\n      \"email\": \"{{ $('HubSpot - Récupère contact').item.json.properties.email.value }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2016, 0],
+      "id": "b0c05907-8ba0-4dcc-9ebc-df0f773c2a82",
+      "name": "API SignatureAPI - Crée envelope",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "operation": "get",
+        "contactId": {
+          "__rl": true,
+          "value": "={{ $json.associations.associatedVids[0] }}",
+          "mode": "id"
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [672, 0],
+      "id": "fc3dc70f-1f68-480d-89fb-9a4434f1d591",
+      "name": "HubSpot - Récupère contact",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1344, 0],
+      "id": "4bd360a2-646d-44e6-a7f5-493710245d2a",
+      "name": "HTTP - Télécharge PDF"
+    },
+    {
+      "parameters": {
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1568, 0],
+      "id": "9d5dd088-b614-45b1-898f-efd12211a8c4",
+      "name": "Drive - Uploade PDF",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vRsXCsE5abdK8R6i",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1792, 0],
+      "id": "7411a1c0-1f8e-4669-9bd4-2dde8cd0520b",
+      "name": "Drive - Partage PDF public",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vRsXCsE5abdK8R6i",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "HubSpot - Cherche deals à signer": {
+      "main": [[{ "node": "HubSpot - Récupère deal", "type": "main", "index": 0 }]]
+    },
+    "API HubSpot - URL fichier signé": {
+      "main": [[{ "node": "HTTP - Télécharge PDF", "type": "main", "index": 0 }]]
+    },
+    "HubSpot - Récupère deal": {
+      "main": [[{ "node": "HubSpot - Récupère contact", "type": "main", "index": 0 }]]
+    },
+    "HubSpot - Récupère engagement": {
+      "main": [[{ "node": "API HubSpot - URL fichier signé", "type": "main", "index": 0 }]]
+    },
+    "Webhook - Demande signature devis": {
+      "main": [[{ "node": "HubSpot - Cherche deals à signer", "type": "main", "index": 0 }]]
+    },
+    "HubSpot - Récupère contact": {
+      "main": [[{ "node": "HubSpot - Récupère engagement", "type": "main", "index": 0 }]]
+    },
+    "HTTP - Télécharge PDF": {
+      "main": [[{ "node": "Drive - Uploade PDF", "type": "main", "index": 0 }]]
+    },
+    "Drive - Uploade PDF": {
+      "main": [[{ "node": "Drive - Partage PDF public", "type": "main", "index": 0 }]]
+    },
+    "Drive - Partage PDF public": {
+      "main": [[{ "node": "API SignatureAPI - Crée envelope", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["HUBSPOT", "CRM & VENTES"]
+}

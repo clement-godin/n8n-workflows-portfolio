@@ -1,0 +1,389 @@
+{
+  "name": "EMAFUITES - Notification tournée J-1",
+  "active": false,
+  "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 19
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          0
+        ],
+        "id": "aff338ea-f863-4043-add4-7932468d3d90",
+        "name": "Trigger - Notif tournée J-1"
+      },
+      {
+        "parameters": {
+          "jsCode": "const tomorrow = new Date();\ntomorrow.setDate(tomorrow.getDate() + 1);\n\n// Exclure si demain c'est samedi ou dimanche\nconst dow = tomorrow.getDay();\nif (dow === 0 || dow === 6) {\n  return [{ json: { skip: true } }];\n}\n\nreturn [{\n  json: {\n    skip: false,\n    date_demain: tomorrow.toISOString().split('T')[0], // YYYY-MM-DD\n    date_label: tomorrow.toLocaleDateString('fr-FR', {\n      weekday: 'long', day: 'numeric', month: 'long'\n    }),\n  }\n}];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          224,
+          0
+        ],
+        "id": "060dbc74-fc4a-42f0-b0ad-74845906d8fe",
+        "name": "Code - Date demain"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 3,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "867c2a5a-6e0d-4424-8f3d-04ee81a5dbe6",
+                "leftValue": "={{ $json.skip }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "false",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          448,
+          0
+        ],
+        "id": "33c931b6-d748-46da-9c94-290c3e7f8d0d",
+        "name": "Si - Jour ouvér"
+      },
+      {
+        "parameters": {
+          "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "hubspotAppToken",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"filterGroups\": [{\n    \"filters\": [\n      {\n        \"propertyName\": \"rdv_date\",\n        \"operator\": \"EQ\",\n        \"value\": \"{{ $json.date_demain }}\"\n      },\n      {\n        \"propertyName\": \"rdv_lat\",\n        \"operator\": \"HAS_PROPERTY\"\n      }\n    ]\n  }],\n  \"properties\": [\n    \"rdv_lat\", \"rdv_lng\", \"rdv_date\", \"rdv_adresse\",\n    \"technicien_assigne\", \"duree_intervention\",\n    \"dealname\", \"ordre_tournee\", \"eta_arrivee\"\n  ],\n  \"sorts\": [{ \"propertyName\": \"ordre_tournee\", \"direction\": \"ASCENDING\" }],\n  \"limit\": 100\n}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          672,
+          0
+        ],
+        "id": "8bae08b3-8870-43cd-8a37-0d09530224e6",
+        "name": "API HubSpot - Cherche RDV demain",
+        "credentials": {
+          "hubspotAppToken": {
+            "id": "JnaOUFzIE4lA3O1R",
+            "name": "HubSpot account EMA FUITES"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const deals = $input.first().json.results || [];\nconst { date_demain, date_label } = $('Code - Date demain').first().json;\n\nconst techHomes = {\n  tech1: { lat: 50.6292, lng: 3.0573, nom: 'Technicien 1', email: 'tech1@your-domain.com' },\n  tech2: { lat: 50.5284, lng: 2.9887, nom: 'Technicien 2', email: 'tech2@your-domain.com' },\n};\n\nconst grouped = { tech1: [], tech2: [] };\n\nfor (const deal of deals) {\n  const tech = deal.properties.technicien_assigne;\n  if (grouped[tech]) grouped[tech].push(deal);\n}\n\nconst result = [];\n\nfor (const [techId, jobs] of Object.entries(grouped)) {\n  if (jobs.length === 0) continue;\n\n  result.push({\n    techId,\n    techInfo: techHomes[techId],\n    jobs: jobs.map(d => ({\n      dealId: d.id,\n      nom: d.properties.dealname,\n      adresse: d.properties.rdv_adresse,\n      lat: parseFloat(d.properties.rdv_lat),\n      lng: parseFloat(d.properties.rdv_lng),\n      duree: parseInt(d.properties.duree_intervention) || 60,\n      ordre: parseInt(d.properties.ordre_tournee) || 0,\n    })).sort((a, b) => a.ordre - b.ordre),\n    date_demain,\n    date_label,\n  });\n}\n\nreturn result.map(r => ({ json: r }));"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          896,
+          0
+        ],
+        "id": "c43379e7-81c0-456e-a633-2e3ece84b964",
+        "name": "Code - Groupe deals par tech"
+      },
+      {
+        "parameters": {
+          "jsCode": "const { techId, techInfo, jobs, date_demain } = $input.first().json;\n\nconst payload = {\n  vehicles: [{\n    id: 1,\n    profile: 'car',\n    start: [techInfo.lng, techInfo.lat],\n    end:   [techInfo.lng, techInfo.lat],\n    time_window: [28800, 64800],\n  }],\n  jobs: jobs.map(j => ({\n    id: j.dealId,\n    location: [j.lng, j.lat],\n    service: j.duree * 60,\n  })),\n};\n\nreturn [{ json: { payload, techId, techInfo, jobs, date_demain } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1120,
+          0
+        ],
+        "id": "2e8f5a79-75bf-4953-ab3d-3632f47a9faa",
+        "name": "Code - Build Vroom final"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://vroom:3000",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.payload) }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          1344,
+          0
+        ],
+        "id": "2d26326d-5ec1-4d88-9552-43fc62194e88",
+        "name": "API Vroom - Calcule tournée"
+      },
+      {
+        "parameters": {
+          "jsCode": "const vroomResponse = $input.first().json;\nconst { techId, techInfo, jobs, date_demain } = $('Code - Build Vroom final').first().json;\n\nfunction secondsToTime(seconds) {\n  const base = new Date(date_demain);\n  base.setHours(0, 0, 0, 0);\n  base.setSeconds(base.getSeconds() + seconds);\n  return base.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });\n}\n\nfunction secondsToISO(seconds) {\n  const base = new Date(date_demain);\n  base.setHours(0, 0, 0, 0);\n  base.setSeconds(base.getSeconds() + seconds);\n  return base.toISOString();\n}\n\nconst steps = vroomResponse.routes[0].steps.filter(s => s.type === 'job');\n\nconst tournee = steps.map((step, index) => {\n  const job = jobs.find(j => j.dealId === String(step.job));\n  return {\n    ordre: index + 1,\n    dealId: String(step.job),\n    nom: job?.nom || '',\n    adresse: job?.adresse || '',\n    eta_heure: secondsToTime(step.arrival),\n    eta_iso: secondsToISO(step.arrival),\n    duree: job?.duree || 60,\n  };\n});\n\n// Composer le message email\nconst lignes = tournee.map(t =>\n  `${t.ordre}. ${t.eta_heure} — ${t.nom}\\n   📍 ${t.adresse} (${t.duree} min)`\n).join('\\n\\n');\n\nconst emailBody = `Bonjour ${techInfo.nom},\n\nVoici votre tournée du ${new Date(date_demain).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })} :\n\n${lignes}\n\nBonne journée`;\n\n// Composer message court Telegram\nconst telegramMsg = tournee.map(t =>\n  `${t.ordre}. ${t.eta_heure} — ${t.adresse}`\n).join('\\n');\n\nreturn [{\n  json: {\n    techId,\n    techInfo,\n    tournee,\n    emailBody,\n    telegramMsg: `🗓 Tournée de demain :\\n\\n${telegramMsg}`,\n    date_demain,\n  }\n}];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1568,
+          0
+        ],
+        "id": "8333bc42-3883-40a8-af54-5f48aa76315b",
+        "name": "Code - Formate notification"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          1792,
+          0
+        ],
+        "id": "2c1394d4-100e-494d-bd6b-4dc3908ea1c3",
+        "name": "Boucle - Par technicien"
+      },
+      {
+        "parameters": {
+          "text": "={{ $json.telegramMsg }}",
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          2016,
+          -192
+        ],
+        "id": "757d4651-efc7-4a4b-b755-b267e0bf1a76",
+        "name": "Telegram - Envoie tournée",
+        "webhookId": "3cd27890-b75d-45c3-9903-829b53a1bffe",
+        "credentials": {
+          "telegramApi": {
+            "id": "ANwJJzGIjJRpbpNN",
+            "name": "Transcription_audio_n8n_clem_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resource": "deal",
+          "operation": "update",
+          "dealId": {
+            "__rl": true,
+            "mode": "list",
+            "value": ""
+          },
+          "updateFields": {}
+        },
+        "type": "n8n-nodes-base.hubspot",
+        "typeVersion": 2.2,
+        "position": [
+          2016,
+          0
+        ],
+        "id": "f4851067-5e22-4151-bb45-42ea9ce23285",
+        "name": "HubSpot - Maj deal tournée"
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "calendar": {
+            "__rl": true,
+            "mode": "list",
+            "value": ""
+          },
+          "updateFields": {}
+        },
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1.3,
+        "position": [
+          2240,
+          80
+        ],
+        "id": "083edadf-ad99-44ed-a649-46bad4dd45a6",
+        "name": "Calendar - Maj événement",
+        "credentials": {
+          "googleCalendarOAuth2Api": {
+            "id": "0zVXfvLleXuQj2Pn",
+            "name": "Google Calendar account"
+          }
+        }
+      }
+  ],
+  "connections": {
+      "Trigger - Notif tournée J-1": {
+        "main": [
+          [
+            {
+              "node": "Code - Date demain",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Date demain": {
+        "main": [
+          [
+            {
+              "node": "Si - Jour ouvér",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Si - Jour ouvér": {
+        "main": [
+          [
+            {
+              "node": "API HubSpot - Cherche RDV demain",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "API HubSpot - Cherche RDV demain": {
+        "main": [
+          [
+            {
+              "node": "Code - Groupe deals par tech",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Groupe deals par tech": {
+        "main": [
+          [
+            {
+              "node": "Code - Build Vroom final",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Build Vroom final": {
+        "main": [
+          [
+            {
+              "node": "API Vroom - Calcule tournée",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "API Vroom - Calcule tournée": {
+        "main": [
+          [
+            {
+              "node": "Code - Formate notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code - Formate notification": {
+        "main": [
+          [
+            {
+              "node": "Boucle - Par technicien",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Boucle - Par technicien": {
+        "main": [
+          [
+            {
+              "node": "Telegram - Envoie tournée",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "HubSpot - Maj deal tournée",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HubSpot - Maj deal tournée": {
+        "main": [
+          [
+            {
+              "node": "Calendar - Maj événement",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Calendar - Maj événement": {
+        "main": [
+          [
+            {
+              "node": "Boucle - Par technicien",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+  },
+  "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "timeSavedMode": "fixed",
+      "errorWorkflow": "wg0YurkUmY4jQap6",
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false
+  }
+}

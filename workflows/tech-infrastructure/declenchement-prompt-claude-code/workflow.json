@@ -1,0 +1,291 @@
+{
+  "name": "DECLENCHEMENT PROMPT CLAUDE CODE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "triggerAtHour": 4, "triggerAtMinute": 45 }] }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-512, -16],
+      "id": "sched-01",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_GOOGLE_SHEET_ID" },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": 0,
+          "cachedResultName": "claude_code_prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-288, -16],
+      "id": "gs-read-01",
+      "name": "Lire lignes",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst now = new Date();\nconst today = now.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });\nconst todo = items.filter(i => {\n  const statut = (i.json.statut || '').trim();\n  if (statut !== 'à faire') return false;\n  const dp = (i.json.date_prevue || '').trim();\n  if (!dp) return true;\n  return dp === today;\n});\nif (!todo.length) return [];\nconst prio = { 'haute': 0, 'moyenne': 1, 'basse': 2 };\ntodo.sort((a, b) => (prio[(a.json.priorite || '').toLowerCase()] ?? 3) - (prio[(b.json.priorite || '').toLowerCase()] ?? 3));\nreturn todo;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-64, -16],
+      "id": "code-filter",
+      "name": "Filtrer et trier"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 2, "leftValue": "", "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $input.first().json.id }}",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true },
+              "rightValue": "",
+              "id": "condition-1782158789676-uwx6kwraf"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [160, -16],
+      "id": "if-lines",
+      "name": "Des lignes ?"
+    },
+    {
+      "parameters": { "options": {} },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [384, -16],
+      "id": "split-01",
+      "name": "SplitInBatches"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_GOOGLE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "claude_code_prompts" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "statut": "en cours",
+            "date_lancement": "={{ new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }}",
+            "row_number": 0
+          },
+          "matchingColumns": ["id"],
+          "schema": [
+            { "id": "id", "displayName": "id", "required": false, "defaultMatch": true, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "titre", "displayName": "titre", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "repertoire_projet", "displayName": "repertoire_projet", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "statut", "displayName": "statut", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "priorite", "displayName": "priorite", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "date_creation", "displayName": "date_creation", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "date_lancement", "displayName": "date_lancement", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "date_fin", "displayName": "date_fin", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "resume", "displayName": "resume", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "erreur", "displayName": "erreur", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "prompt", "displayName": "prompt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "row_number", "displayName": "row_number", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true, "readOnly": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [608, -80],
+      "id": "gs-update-enc",
+      "name": "Marque en cours",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('SplitInBatches').item.json;\nconst instr = '\\n\\n---\\nIMPORTANT : à la toute fin de ta réponse, ajoute exactement une ligne commençant par RAPPORT_JSON: suivie du JSON sur une seule ligne :\\nRAPPORT_JSON: {\"statut\": \"succès\", \"résumé\": \"description courte\", \"erreurs\": []}\\n(statut = succès | partiel | échec)';\nlet prompt = item.prompt || '';\nif (!prompt.includes('RAPPORT_JSON:')) prompt += instr;\nconst b64 = Buffer.from(prompt).toString('base64');\nconst tmpFile = '/home/debian/prompts/tmp_' + item.id + '.md';\nreturn [{ json: { ...item, prompt_b64: b64, tmp_file: tmpFile } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [832, -80],
+      "id": "code-prep",
+      "name": "Prépare prompt"
+    },
+    {
+      "parameters": { "authentication": "privateKey", "command": "={{ $json.ssh_command }}" },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1280, -80],
+      "id": "ssh-exec-01",
+      "name": "SSH - Écrit et exécute",
+      "credentials": { "sshPrivateKey": { "id": "bt56RSR5H3bzgKsg", "name": "SSH Private Key account" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rowData = $('Prépare prompt').item.json;\nconst sshOut = $input.first().json;\nconst stdout = String(sshOut.stdout || '');\nconst stderr = String(sshOut.stderr || '');\nlet statut_final, resume, erreur_msg, telegram_emoji;\nlet outer = null;\ntry { outer = JSON.parse(stdout.trim()); } catch(e) {\n  const m = stdout.match(/\\{[\\s\\S]+\\}$/);\n  if (m) { try { outer = JSON.parse(m[0]); } catch(e2) {} }\n}\nif (!outer) {\n  statut_final = 'échec'; erreur_msg = 'Sortie non-JSON: ' + stdout.slice(0,300) + (stderr ? ' | stderr: ' + stderr.slice(0,200) : ''); resume = ''; telegram_emoji = '❌';\n} else if (outer.is_error) {\n  statut_final = 'échec'; erreur_msg = 'Claude Code error: ' + String(outer.result||'').slice(0,500); resume = ''; telegram_emoji = '❌';\n} else {\n  const resultText = String(outer.result || '');\n  const match = resultText.match(/RAPPORT_JSON:\\s*(\\{.+\\})/);\n  if (match) {\n    try {\n      const inner = JSON.parse(match[1]);\n      const s = inner.statut || 'succès';\n      statut_final = (s === 'échec') ? 'échec' : 'effectué';\n      resume = (inner['résumé'] || inner.resume || resultText.slice(-800)).slice(0, 2000);\n      erreur_msg = s === 'échec' ? JSON.stringify(inner.erreurs||[]).slice(0,1000) : '';\n      telegram_emoji = s === 'succès' ? '✅' : s === 'partiel' ? '⚠️' : '❌';\n    } catch(e) { statut_final = 'effectué'; resume = resultText.slice(-1000); erreur_msg = ''; telegram_emoji = '✅'; }\n  } else { statut_final = 'effectué'; resume = resultText.slice(-1000); erreur_msg = ''; telegram_emoji = '✅'; }\n}\nconst telegram_msg = telegram_emoji + ' ' + (rowData.titre||'') + '\\n📁 ' + (rowData.repertoire_projet||'') + '\\n📝 ' + resume.slice(0,400);\nreturn [{ json: { id: rowData.id, titre: rowData.titre, repertoire_projet: rowData.repertoire_projet, tmp_file: rowData.tmp_file, statut_final, resume: resume.slice(0,2000), erreur_msg: erreur_msg.slice(0,1000), telegram_msg, date_fin: new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1504, -80],
+      "id": "code-parse",
+      "name": "Parse résultat"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_GOOGLE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "claude_code_prompts" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "statut": "={{ $json.statut_final }}",
+            "date_fin": "={{ $json.date_fin }}",
+            "resume": "={{ $json.resume }}",
+            "erreur": "={{ $json.erreur_msg }}"
+          },
+          "matchingColumns": ["id"],
+          "schema": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1728, -80],
+      "id": "gs-update-fin",
+      "name": "Mise à jour finale",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": { "authentication": "privateKey", "command": "={{ `rm -f ${$('Prépare prompt').item.json.tmp_file}` }}" },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1952, -80],
+      "id": "ssh-del-01",
+      "name": "Supprime fichier",
+      "credentials": { "sshPrivateKey": { "id": "bt56RSR5H3bzgKsg", "name": "SSH Private Key account" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $('Parse résultat').item.json.telegram_msg }}",
+        "additionalFields": { "appendAttribution": false, "parse_mode": "Markdown" }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2176, 0],
+      "id": "tg-01",
+      "name": "Telegram",
+      "webhookId": "85007140-8344-4f99-8e8f-100e9896cd87",
+      "credentials": { "telegramApi": { "id": "zteuycKXeHxzAROh", "name": "notif_erreur_workflow_n8n_bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst b64 = item.prompt_b64 || '';\nconst tf = item.tmp_file || '';\nconst rp = item.repertoire_projet || '';\nconst modeleBrut = (item.modele || '').trim().toLowerCase();\nconst modeleFinal = ['sonnet', 'opus', 'haiku'].includes(modeleBrut) ? modeleBrut : 'sonnet';\nconst cmd = `export TF='${tf}' RP='${rp}'; mkdir -p /home/debian/prompts && echo '${b64}' | base64 -d > \"$TF\" && cd \"$RP\" && timeout 1800 /home/debian/.nvm/versions/node/v22.22.3/bin/claude --dangerously-skip-permissions --model ${modeleFinal} -p \"$(cat $TF)\" --print --output-format json`;\nreturn [{ json: { ...item, ssh_command: cmd, modele_final: modeleFinal } }];"
+      },
+      "id": "code-build-cmd",
+      "name": "Build SSH command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1056, -80]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "/home/debian/.nvm/versions/node/v22.22.3/bin/claude --dangerously-skip-permissions -p \"Ton prompt ici\" --print --output-format json"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [-288, 224],
+      "id": "8f4df6ce-1dd7-4033-9415-eb856f690905",
+      "name": "SSH - Écrit et exécute1",
+      "credentials": { "sshPrivateKey": { "id": "bt56RSR5H3bzgKsg", "name": "SSH Private Key account" } },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.is_error || $json.statut === \"échec\" ? \"❌\" : \"✅\" }} Reset fenêtre Claude CLI\n📝 {{ $json.result || $json.resume || \"Exécution terminée\" }}",
+        "additionalFields": { "appendAttribution": false, "parse_mode": "Markdown" }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [160, 224],
+      "id": "ee408fa5-9f42-4188-a55a-9c673ce23a63",
+      "name": "Telegram1",
+      "webhookId": "85007140-8344-4f99-8e8f-100e9896cd87",
+      "credentials": { "telegramApi": { "id": "zteuycKXeHxzAROh", "name": "notif_erreur_workflow_n8n_bot" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.claudeResponse || $json.stdout || '';\nconst match = raw.match(/\\{[\\s\\S]*\\}/);\nconst claudeJson = match ? JSON.parse(match[0]) : null;\n\nif (!claudeJson) {\n  return [{ json: { statut: \"échec\", resume: \"Sortie non-JSON: \" + raw.slice(0, 200) } }];\n}\n\nlet resume, statut;\n\nif (claudeJson.is_error) {\n  statut = \"échec\";\n  resume = claudeJson.result || \"Erreur inconnue\";\n} else {\n  const nestedMatch = (claudeJson.result || '').match(/\\{[\\s\\S]*\\}/);\n  if (nestedMatch) {\n    try {\n      const rapport = JSON.parse(nestedMatch[0]);\n      statut = rapport.statut === \"échec\" ? \"échec\" : \"effectué\";\n      resume = rapport.résumé || rapport.resume || claudeJson.result;\n    } catch {\n      statut = \"effectué\";\n      resume = claudeJson.result;\n    }\n  } else {\n    statut = \"effectué\";\n    resume = claudeJson.result;\n  }\n}\n\nreturn [{ json: { statut, resume } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-64, 224],
+      "id": "8b3cd441-4dad-4290-9ae2-9c21f5f886d4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": { "rule": { "interval": [{ "triggerAtHour": 2 }, { "triggerAtHour": 8 }] } },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-512, 224],
+      "id": "94dc15ba-bc92-452e-9423-a5322e996142",
+      "name": "Schedule Trigger TOUS LES 6H"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "Lire lignes", "type": "main", "index": 0 }]] },
+    "Lire lignes": { "main": [[{ "node": "Filtrer et trier", "type": "main", "index": 0 }]] },
+    "Filtrer et trier": { "main": [[{ "node": "Des lignes ?", "type": "main", "index": 0 }]] },
+    "Des lignes ?": { "main": [[{ "node": "SplitInBatches", "type": "main", "index": 0 }]] },
+    "SplitInBatches": { "main": [[], [{ "node": "Marque en cours", "type": "main", "index": 0 }]] },
+    "Marque en cours": { "main": [[{ "node": "Prépare prompt", "type": "main", "index": 0 }]] },
+    "Prépare prompt": { "main": [[{ "node": "Build SSH command", "type": "main", "index": 0 }]] },
+    "SSH - Écrit et exécute": { "main": [[{ "node": "Parse résultat", "type": "main", "index": 0 }]] },
+    "Parse résultat": { "main": [[{ "node": "Mise à jour finale", "type": "main", "index": 0 }]] },
+    "Mise à jour finale": { "main": [[{ "node": "Supprime fichier", "type": "main", "index": 0 }]] },
+    "Supprime fichier": { "main": [[{ "node": "Telegram", "type": "main", "index": 0 }]] },
+    "Telegram": { "main": [[{ "node": "SplitInBatches", "type": "main", "index": 0 }]] },
+    "Build SSH command": { "main": [[{ "node": "SSH - Écrit et exécute", "type": "main", "index": 0 }]] },
+    "SSH - Écrit et exécute1": { "main": [[{ "node": "Code in JavaScript", "type": "main", "index": 0 }]] },
+    "Code in JavaScript": { "main": [[{ "node": "Telegram1", "type": "main", "index": 0 }]] },
+    "Schedule Trigger TOUS LES 6H": { "main": [[{ "node": "SSH - Écrit et exécute1", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

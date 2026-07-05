@@ -1,0 +1,357 @@
+{
+  "name": "CHECK PAGE SPEED INSIGHT API",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{}]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-64, -768],
+      "id": "49fcc787-7267-40f3-9da4-895bc58965b2",
+      "name": "Trigger - PSI EMAFUITES"
+    },
+    {
+      "parameters": {
+        "url": "https://emafuites.fr/sitemap.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [160, -768],
+      "id": "80759f20-bcd6-4959-89b4-72d7c78f7551",
+      "name": "HTTP - Sitemap EMAFUITES"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [384, -768],
+      "id": "f03465fd-52eb-4f7d-9f05-9902f0c73489",
+      "name": "XML - Parse sitemap EMAFUITES"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On cible la liste des URLs contenues dans le sitemap\nconst urls = $input.first().json.urlset.url;\n\n// URLs à ajouter manuellement\nconst urlsSupplementaires = [\n  'https://emafuites.fr/ads/fuite-sous-carrelage',\n  'https://emafuites.fr/ads/fuite-canalisation',\n  'https://emafuites.fr/ads/fuite-toiture-terrasse',\n  'https://emafuites.fr/ads/fuite-plancher-chauffant',\n  'https://emafuites.fr/ads/infiltration-humidite-mur',\n  'https://emafuites.fr/ads/recherche-fuite-non-destructive',\n  'https://renovation.emarenovation59.fr/'\n];\n\n// On crée un nouvel \"item\" n8n pour chaque URL du sitemap\nconst itemsSitemap = urls.map(item => ({\n  json: {\n    url: item.loc\n  }\n}));\n\n// On crée un nouvel \"item\" n8n pour chaque URL ajoutée manuellement\nconst itemsSupplementaires = urlsSupplementaires.map(url => ({\n  json: {\n    url\n  }\n}));\n\n// On retourne tous les items\nreturn [\n  ...itemsSitemap,\n  ...itemsSupplementaires\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [608, -768],
+      "id": "35adb7d0-2aae-4c20-98b0-5b3e27d2c4de",
+      "name": "Code JS - Extrait URLs EMAFUITES"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "5b14d9ba-75df-426c-8f92-65fd504b526b",
+              "leftValue": "={{ $json.alertePerformance }}",
+              "rightValue": 1,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2848, -936],
+      "id": "b7fd6372-04d2-4db6-9d75-c453f59e37c7",
+      "name": "Si - Alerte perf EMAFUITES"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=⚠️ Alerte Performance SEO\n\nL'URL : {{ $json.url }} nécessite ton attention.\n📅 Analysé le : {{ DateTime.fromISO($('Merge - Mobile+Desktop EMAFUITES').item.json.date).setZone('Europe/Paris').toFormat('dd/MM/yyyy à HH:mm') }}\n\nNombre d'anomalies détectées : {{ $json.nombreAnomaliesPerformance }}\n\n🚨 --- MÉTRIQUES À CORRIGER --- 🚨\n{{ $json.anomaliesPerformance.join('\\n') }}\n\nVa jeter un œil pour optimiser les métriques signalées. 🛠️",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [3072, -864],
+      "id": "d55d19cc-5053-40b4-adda-697837652593",
+      "name": "Send a text message",
+      "webhookId": "446646df-917c-4b3a-910e-9e02caa689b3",
+      "credentials": {
+        "telegramApi": { "id": "zteuycKXeHxzAROh", "name": "notif_erreur_workflow_n8n_bot" }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "url", "value": "={{ $json.url }}" },
+            { "name": "strategy", "value": "desktop" }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1280, -1104],
+      "id": "bb3e38a4-12e9-44a2-b9e9-a3c35c6fa783",
+      "name": "Test Desktop",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpQueryAuth": { "id": "9gpMFwGDa4nnd0pv", "name": "Google PageSpeed API Key" }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/pagespeedonline/v5/runPagespeed",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "url", "value": "={{ $('Code JS - Extrait URLs EMAFUITES').item.json.url }}" },
+            { "name": "strategy", "value": "mobile" }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1280, -912],
+      "id": "36eebbda-fe26-472a-bb35-68f8b271ca4b",
+      "name": "Test mobile",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpQueryAuth": { "id": "9gpMFwGDa4nnd0pv", "name": "Google PageSpeed API Key" }
+      }
+    },
+    {
+      "parameters": { "amount": 1, "unit": "minutes" },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1056, -912],
+      "id": "2be6f79c-e900-48fe-bbc8-260e0864e66d",
+      "name": "Attente - 1min mobile EMAFUITES",
+      "webhookId": "416f16f8-3e43-413f-ae17-ae32d8aef0bb"
+    },
+    {
+      "parameters": { "amount": 1, "unit": "minutes" },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1056, -1104],
+      "id": "0377bef6-270f-4d3e-896e-dc585dce6e57",
+      "name": "Attente - 1min desktop EMAFUITES",
+      "webhookId": "416f16f8-3e43-413f-ae17-ae32d8aef0bb"
+    },
+    {
+      "parameters": { "options": {} },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [832, -768],
+      "id": "be130c0d-e81b-42a6-be98-c97a012fba4d",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "listing APPEL PAGE SPEED INSIGHT",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ DateTime.fromISO($json.date\n).setZone('Europe/Paris').toFormat('dd/MM/yyyy') }}",
+            "url": "={{ $('Test Desktop').item.json.id }}",
+            "SCORE FCP DESKTOP < 1,8 s": "={{ $json[\"SCORE FCP DESKTOP\"] }}",
+            "SCORE LCP DESKTOP < 2,5 s": "={{ $json[\"SCORE LCP DESKTOP\"] }}",
+            "TBT DESKTOP < 250 ms": "={{ $json[\"TBT DESKTOP\"] }}",
+            "CLS DESKTOP < 0,1": "={{ $json[\"CLS DESKTOP\"] }}",
+            "SPEED INDEX DESKTOP < 3,4 s": "={{ $json[\"SPEED INDEX DESKTOP\"] }}",
+            "SCORE FCP MOBILE < 1,8 s": "={{ $json[\"SCORE FCP MOBILE\"] }}",
+            "SCORE LCP MOBILE < 2,5 s": "={{ $json[\"SCORE LCP MOBILE\"] }}",
+            "TBT MOBILE < 250 ms": "={{ $json[\"TBT MOBILE\"] }}",
+            "CLS MOBILE < 0,1": "={{ $json[\"CLS MOBILE\"] }}",
+            "SPEED INDEX MOBILE < 4,2 s": "={{ $json[\"SPEED INDEX MOBILE\"] }}",
+            "SCORE GLOBAL DESKTOP": "={{ $json[\"SCORE GLOBAL DESKTOP\"] }}",
+            "SCORE GLOBAL MOBILE": "={{ $json[\"SCORE GLOBAL MOBILE\"] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "date", "displayName": "date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "url", "displayName": "url", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "SCORE GLOBAL DESKTOP", "displayName": "SCORE GLOBAL DESKTOP", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "SCORE FCP DESKTOP < 1,8 s", "displayName": "SCORE FCP DESKTOP < 1,8 s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "SCORE LCP DESKTOP < 2,5 s", "displayName": "SCORE LCP DESKTOP < 2,5 s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "TBT DESKTOP < 250 ms", "displayName": "TBT DESKTOP < 250 ms", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "CLS DESKTOP < 0,1", "displayName": "CLS DESKTOP < 0,1", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "SPEED INDEX DESKTOP < 3,4 s", "displayName": "SPEED INDEX DESKTOP < 3,4 s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "SCORE GLOBAL MOBILE", "displayName": "SCORE GLOBAL MOBILE", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "SCORE FCP MOBILE < 1,8 s", "displayName": "SCORE FCP MOBILE < 1,8 s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "SCORE LCP MOBILE < 2,5 s", "displayName": "SCORE LCP MOBILE < 2,5 s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "TBT MOBILE < 250 ms", "displayName": "TBT MOBILE < 250 ms", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "CLS MOBILE < 0,1", "displayName": "CLS MOBILE < 0,1", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "SPEED INDEX MOBILE < 4,2 s", "displayName": "SPEED INDEX MOBILE < 4,2 s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2400, -1008],
+      "id": "cf48e404-87e1-416c-8d67-3c3fe714cef3",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst audits = data.lighthouseResult.audits;\n\nreturn [{\n  json: {\n    \"url\": data.url,\n    \"date\": data.analysisUTCTimestamp,\n    \"SCORE GLOBAL MOBILE\": Math.round(data.lighthouseResult.categories.performance.score * 100),\n    \"SCORE FCP MOBILE\":    parseFloat((audits[\"first-contentful-paint\"].numericValue / 1000).toFixed(2)),\n    \"SCORE LCP MOBILE\":    parseFloat((audits[\"largest-contentful-paint\"].numericValue / 1000).toFixed(2)),\n    \"TBT MOBILE\":          Math.round(audits[\"total-blocking-time\"].numericValue), // Conservé en ms\n    \"CLS MOBILE\":          parseFloat(audits[\"cumulative-layout-shift\"].numericValue.toFixed(3)),\n    \"SPEED INDEX MOBILE\":  parseFloat((audits[\"speed-index\"].numericValue / 1000).toFixed(2)),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1504, -912],
+      "id": "a0c9cc37-28cd-4d56-b9c0-f8aa22511e1f",
+      "name": "Code JS - Métriques mobile EMAFUITES",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst audits = data.lighthouseResult.audits;\n\nreturn [{\n  json: {\n    \"url\": data.url,\n    \"date\": data.analysisUTCTimestamp,\n    \"SCORE GLOBAL DESKTOP\": Math.round(data.lighthouseResult.categories.performance.score * 100),\n    \"SCORE FCP DESKTOP\":    parseFloat((audits[\"first-contentful-paint\"].numericValue / 1000).toFixed(2)),\n    \"SCORE LCP DESKTOP\":    parseFloat((audits[\"largest-contentful-paint\"].numericValue / 1000).toFixed(2)),\n    \"TBT DESKTOP\":          Math.round(audits[\"total-blocking-time\"].numericValue), // Conservé en ms\n    \"CLS DESKTOP\":          parseFloat(audits[\"cumulative-layout-shift\"].numericValue.toFixed(3)),\n    \"SPEED INDEX DESKTOP\":  parseFloat((audits[\"speed-index\"].numericValue / 1000).toFixed(2)),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1504, -1104],
+      "id": "67b0128c-dcb0-4903-a9eb-c86c45c4e06f",
+      "name": "Code JS - Métriques desktop EMAFUITES",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": { "includeUnpaired": true }
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [1728, -1008],
+      "id": "aa14a017-48b4-4d7e-bcaf-f4c67e65c11b",
+      "name": "Merge - Mobile+Desktop EMAFUITES"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst checks = [\n  // DESKTOP\n  { name: \"SCORE GLOBAL DESKTOP\", value: item[\"SCORE GLOBAL DESKTOP\"], operator: \"less\", threshold: 90, unit: \"/100\" },\n  { name: \"SCORE FCP DESKTOP\", value: item[\"SCORE FCP DESKTOP\"], operator: \"greater\", threshold: 1, unit: \"s\" },\n  { name: \"SCORE LCP DESKTOP\", value: item[\"SCORE LCP DESKTOP\"], operator: \"greater\", threshold: 2, unit: \"s\" },\n  { name: \"TBT DESKTOP\", value: item[\"TBT DESKTOP\"], operator: \"greater\", threshold: 100, unit: \"ms\" },\n  { name: \"CLS DESKTOP\", value: item[\"CLS DESKTOP\"], operator: \"greater\", threshold: 0.05, unit: \"\" },\n  { name: \"SPEED INDEX DESKTOP\", value: item[\"SPEED INDEX DESKTOP\"], operator: \"greater\", threshold: 1.5, unit: \"s\" },\n\n  // MOBILE\n  { name: \"SCORE GLOBAL MOBILE\", value: item[\"SCORE GLOBAL MOBILE\"], operator: \"less\", threshold: 90, unit: \"/100\" },\n  { name: \"SCORE FCP MOBILE\", value: item[\"SCORE FCP MOBILE\"], operator: \"greater\", threshold: 1.8, unit: \"s\" },\n  { name: \"SCORE LCP MOBILE\", value: item[\"SCORE LCP MOBILE\"], operator: \"greater\", threshold: 2.5, unit: \"s\" },\n  { name: \"TBT MOBILE\", value: item[\"TBT MOBILE\"], operator: \"greater\", threshold: 200, unit: \"ms\" },\n  { name: \"CLS MOBILE\", value: item[\"CLS MOBILE\"], operator: \"greater\", threshold: 0.1, unit: \"\" },\n  { name: \"SPEED INDEX MOBILE\", value: item[\"SPEED INDEX MOBILE\"], operator: \"greater\", threshold: 3, unit: \"s\" }\n];\n\nconst anomalies = checks.filter(check => {\n  const value = Number(String(check.value).replace(\",\", \".\"));\n\n  if (Number.isNaN(value)) {\n    return false;\n  }\n\n  if (check.operator === \"less\") {\n    return value < check.threshold;\n  }\n\n  if (check.operator === \"greater\") {\n    return value > check.threshold;\n  }\n\n  return false;\n});\n\nitem.alertePerformance = anomalies.length > 0;\nitem.nombreAnomaliesPerformance = anomalies.length;\nitem.anomaliesPerformance = anomalies.map(a => {\n  const value = Number(String(a.value).replace(\",\", \".\"));\n  const signe = a.operator === \"less\" ? \"<\" : \">\";\n  return `${a.name} : ${value}${a.unit} ${signe} seuil ${a.threshold}${a.unit}`;\n});\n\nreturn [{ json: item }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2624, -1008],
+      "id": "a724ac96-7e80-4c30-a30f-9687c55d1577",
+      "name": "Code JS - Calcule anomalies EMAFUITES"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.filter(item => {\n  const message = item.json.error?.message || '';\n\n  const isLighthouseTimeout =\n    message.includes('Lighthouse returned error: FAILED_DOCUMENT_REQUEST') &&\n    message.includes('net::ERR_TIMED_OUT');\n\n  return !isLighthouseTimeout;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1952, -1008],
+      "id": "d713591b-d436-4013-8245-5083daee137f",
+      "name": "Code JS - Filtre timeout EMAFUITES"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 3, "leftValue": "", "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "c3addf0b-5a22-4f6a-bfe6-6d290f88e5a9",
+              "leftValue": "={{ \n  $json.error?.message?.includes('FAILED_DOCUMENT_REQUEST') \n  || $json.error?.message?.includes('ERR_TIMED_OUT')\n  || $json.error?.code === 'ERR_BAD_REQUEST'\n}}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2176, -1008],
+      "id": "b9b3efbd-0e16-4d30-a910-0532f2b789c9",
+      "name": "Si - Erreur PSI EMAFUITES"
+    }
+  ],
+  "connections": {
+    "Trigger - PSI EMAFUITES": { "main": [[{ "node": "HTTP - Sitemap EMAFUITES", "type": "main", "index": 0 }]] },
+    "HTTP - Sitemap EMAFUITES": { "main": [[{ "node": "XML - Parse sitemap EMAFUITES", "type": "main", "index": 0 }]] },
+    "XML - Parse sitemap EMAFUITES": { "main": [[{ "node": "Code JS - Extrait URLs EMAFUITES", "type": "main", "index": 0 }]] },
+    "Code JS - Extrait URLs EMAFUITES": { "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]] },
+    "Si - Alerte perf EMAFUITES": {
+      "main": [
+        [{ "node": "Send a text message", "type": "main", "index": 0 }],
+        [{ "node": "Loop Over Items", "type": "main", "index": 0 }]
+      ]
+    },
+    "Test Desktop": { "main": [[{ "node": "Code JS - Métriques desktop EMAFUITES", "type": "main", "index": 0 }]] },
+    "Test mobile": { "main": [[{ "node": "Code JS - Métriques mobile EMAFUITES", "type": "main", "index": 0 }]] },
+    "Attente - 1min mobile EMAFUITES": { "main": [[{ "node": "Test mobile", "type": "main", "index": 0 }]] },
+    "Attente - 1min desktop EMAFUITES": { "main": [[{ "node": "Test Desktop", "type": "main", "index": 0 }]] },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          { "node": "Attente - 1min desktop EMAFUITES", "type": "main", "index": 0 },
+          { "node": "Attente - 1min mobile EMAFUITES", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Send a text message": { "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]] },
+    "Append row in sheet": { "main": [[{ "node": "Code JS - Calcule anomalies EMAFUITES", "type": "main", "index": 0 }]] },
+    "Code JS - Métriques desktop EMAFUITES": { "main": [[{ "node": "Merge - Mobile+Desktop EMAFUITES", "type": "main", "index": 0 }]] },
+    "Merge - Mobile+Desktop EMAFUITES": { "main": [[{ "node": "Code JS - Filtre timeout EMAFUITES", "type": "main", "index": 0 }]] },
+    "Code JS - Métriques mobile EMAFUITES": { "main": [[{ "node": "Merge - Mobile+Desktop EMAFUITES", "type": "main", "index": 1 }]] },
+    "Code JS - Calcule anomalies EMAFUITES": { "main": [[{ "node": "Si - Alerte perf EMAFUITES", "type": "main", "index": 0 }]] },
+    "Code JS - Filtre timeout EMAFUITES": { "main": [[{ "node": "Si - Erreur PSI EMAFUITES", "type": "main", "index": 0 }]] },
+    "Si - Erreur PSI EMAFUITES": {
+      "main": [
+        [{ "node": "Loop Over Items", "type": "main", "index": 0 }],
+        [{ "node": "Append row in sheet", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

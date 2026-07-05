@@ -1,0 +1,612 @@
+{
+  "name": "TRI GMAIL COMPTE EMAFUITES version deek seek",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "labelIds": ["INBOX"],
+          "receivedBefore": "="
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [448, 32],
+      "id": "c157dbd9-bf5d-42ab-baeb-5e9c2bcda095",
+      "name": "Get many messages",
+      "webhookId": "3a97d6f9-9b40-4921-8692-f8fdb123b664",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{}]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-224, 32],
+      "id": "c33416c5-a433-410b-83df-afb463f01418",
+      "name": "Trigger - Tri Gmail EMAFUITES"
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [{ "fieldName": "internalDate" }]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [672, 32],
+      "id": "839e340d-250c-44b0-a9b3-6c143690677e",
+      "name": "Trie - Par date"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [896, 32],
+      "id": "8b5a27bf-eab3-4e1a-a6ba-179830cd9b61",
+      "name": "Limite - Emails"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "86ad8d2c-d9ab-4c83-8849-0c0d9e0ee5fa",
+              "leftValue": "={{ $json.deja_classe }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1568, 32],
+      "id": "076c8bff-0814-48ce-8c0e-5fafb5a11659",
+      "name": "Si - Email déjà classé"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. On récupère les emails d'origine du nœud Limit\nconst emailsOriginaux = $('Limite - Emails').all();\n\n// 2. On récupère les Threads qu'on vient de télécharger\nconst threads = $input.all();\n\nlet resultats = [];\n\n// 3. On traite chaque email un par un\nemailsOriginaux.forEach((emailItem, index) => {\n  let dossiersPersos = [];\n  const threadActuel = threads[index].json;\n\n  // 4. On fouille dans la conversation\n  if (threadActuel.messages) {\n    threadActuel.messages.forEach(msg => {\n      if (msg.labels) {\n        msg.labels.forEach(label => {\n          if (label.id.startsWith('Label_') && !dossiersPersos.some(d => d.id === label.id)) {\n            dossiersPersos.push({ id: label.id, name: label.name });\n          }\n        });\n      }\n    });\n  }\n\n  // 5. On prépare le paquet final AVEC LE FIL D'ARIANE\n  resultats.push({\n    json: {\n      ...emailItem.json, \n      deja_classe: dossiersPersos.length > 0,\n      dossiers_trouves: dossiersPersos\n    },\n    // 👇 LA LIGNE MAGIQUE QUI RÉPARE L'ERREUR 👇\n    pairedItem: { item: index } \n  });\n});\n\nreturn resultats;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1344, 32],
+      "id": "bdd3c58c-80e5-4cd5-ae58-5d372a8fef08",
+      "name": "Code JS - Détecte dossiers"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\n\n// On ignore uniquement les labels système inutiles pour le classement\nconst systemLabelsToIgnore = [\n  'chat', 'draft', 'trash', 'spam', 'starred', 'unread', \n  'category_', 'circle', 'star'\n];\n\nconst labelsPropres = allItems\n  .map(item => item.json)\n  .filter(label => {\n    const n = label.name.toLowerCase();\n    \n    // 1. On vire le \"bruit\" système\n    if (systemLabelsToIgnore.some(sys => n.includes(sys))) return false;\n    \n    // 2. On ne garde que tes dossiers (type \"user\")\n    // On peut aussi garder INBOX ou SENT si tu veux, mais pour classer, on ne garde que les dossiers créés par toi.\n    return label.type === 'user';\n  })\n  .map(label => `- [${label.id}] : ${label.name}`);\n\nreturn [{\n  json: {\n    liste_dossiers_texte: labelsPropres.join('\\n'),\n    stats: {\n      labels_envoyes_ia: labelsPropres.length\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [224, 32],
+      "id": "8adc84d9-0be9-4f83-ae7b-6b93177b205a",
+      "name": "Code JS - Filtre labels"
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [0, 32],
+      "id": "c37b05f3-af0f-4d1c-9398-0148f02e60ca",
+      "name": "Get many labels",
+      "webhookId": "9c64d576-c99c-4e6e-a404-c8af1a24a632",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "removeLabels",
+        "messageId": "={{ $json.id }}",
+        "labelIds": ["INBOX"]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [4688, 16],
+      "id": "95fba3f8-d43f-4cf1-b0f5-f146419bb53a",
+      "name": "Remove label from message",
+      "webhookId": "0e36b4ce-cbfd-4629-a526-86824f9b6273",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('Limite - Emails').item.json.id }}",
+        "labelIds": "={{ $json.dossiers_trouves[0].id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1792, -64],
+      "id": "1048a796-afa9-4e0a-a704-a20908f2b823",
+      "name": "Add label to message",
+      "webhookId": "3bd82623-3cbe-4f72-9ef7-70fa8a45707d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "removeLabels",
+        "messageId": "={{ $('Si - Email déjà classé').item.json.id }}",
+        "labelIds": ["INBOX"]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2224, -64],
+      "id": "da0e4daa-79ba-4973-8719-723107baf70b",
+      "name": "Remove label from message1",
+      "webhookId": "e5aa7fcb-ba48-4c17-9fed-5e154ac97387",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "get",
+        "threadId": "={{ $json.threadId }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1120, 32],
+      "id": "2eef146c-e824-4392-a734-3793ef68965b",
+      "name": "Get a thread",
+      "webhookId": "2f78cf8b-b6e0-4ca5-9e9d-8f2cd147a53f",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('Si - Email déjà classé').item.json.id }}",
+        "labelIds": "={{ $json.labelId }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [4464, 16],
+      "id": "da6d7e9f-7de2-4efc-9b98-e8f7a1bc977d",
+      "name": "Add label to message1",
+      "webhookId": "525b9f34-3dd8-44a3-950c-2c6b4de2190b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "GOOGLE_SHEET_ID_A_CONFIGURER",
+          "mode": "list",
+          "cachedResultName": "TRI GMAIL COMPTE PERSO",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/GOOGLE_SHEET_ID_A_CONFIGURER/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/GOOGLE_SHEET_ID_A_CONFIGURER/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Sujet": "={{ $('Code in JavaScript4').item.json.subject }}",
+            "Expéditeur": "={{ $('Code in JavaScript4').item.json.sender }}",
+            " Nom du Dossier.": "={{ $('Code in JavaScript4').item.json.labelName }}",
+            "Résumé": "={{ $('Code in JavaScript4').item.json.reason }}",
+            "Tokens Input": "={{ $('API DeepSeek - Classifie').item.json.usage.prompt_tokens }}",
+            "Tokens Output": "={{ $('API DeepSeek - Classifie').item.json.usage.completion_tokens }}",
+            "Tokens Cache Lu": "={{ $('API DeepSeek - Classifie').item.json.usage.prompt_tokens_details.cached_tokens }}",
+            "Date": "={{ $('Code in JavaScript4').item.json.formattedDate }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Date", "displayName": "Date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Expéditeur", "displayName": "Expéditeur", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Sujet", "displayName": "Sujet", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": " Nom du Dossier.", "displayName": " Nom du Dossier.", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Résumé", "displayName": "Résumé", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Tokens Input", "displayName": "Tokens Input", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Tokens Cache Créé", "displayName": "Tokens Cache Créé", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Tokens Cache Lu", "displayName": "Tokens Cache Lu", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Tokens Output", "displayName": "Tokens Output", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Coût estimé ($)", "displayName": "Coût estimé ($)", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [4912, 16],
+      "id": "4173266c-a68c-4b1a-8ec8-d2cfd02f4f4f",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [4016, 16],
+      "id": "b0fbe7b4-b7dd-4c37-aaad-291e4e6ddac6",
+      "name": "API DeepSeek - Classifie",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "TliXgPxpJQmgqDP0",
+          "name": "Google Search Console API"
+        },
+        "deepSeekApi": {
+          "id": "MBt6ozX97KVIAwcD",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const listesDossiers = $('Code JS - Filtre labels').item.json.liste_dossiers_texte;\n\n\n\n\nconst userMessage = `Expéditeur : ${$json.From}\nSujet : ${$json.Subject}\nContenu : ${$json.snippet}\nDate : ${$json.internalDate}`;\n\nreturn {\n  json: {\n    ...$json,\n    requestBody: JSON.stringify({\n    model: \"deepseek-chat\",\n    temperature: 0,\n    max_tokens: 500,\n    messages: [\n      { role: \"system\", content: systemPrompt },\n      { role: \"user\", content: userMessage }\n    ]\n  })\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3792, 16],
+      "id": "08581123-e838-4d4d-bb4a-97c644533582",
+      "name": "Code JS - Prépare classif"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c4e4f1bf-c79c-4f0c-94ea-7baf20e5ff62",
+              "leftValue": "={{ $json.chauffe_necessaire }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2224, 128],
+      "id": "16fcad4e-f047-492b-b6b5-5fa258953f68",
+      "name": "Si - Chauffe nécessaire"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node Code \"Chauffe Cache DeepSeek\"\nconst listesDossiers = $('Code JS - Filtre labels').item.json.liste_dossiers_texte;\n\n\nconst systemPrompt = `Tu es un automate d'analyse et de classification d'emails professionnels. Ta mission est d'analyser chaque email entrant de la société MEA, de déterminer son classement dans une arborescence stricte, et d'extraire les données nécessaires. Tu ne disposes d'aucun outil. Tu dois répondre UNIQUEMENT par un objet JSON valide, sans aucun texte avant ou après.\n\nLISTE STRICTE ET EXHAUSTIVE DES DOSSIERS AUTORISÉS (ID : Nom) :\n${listesDossiers}\n\n🛠 MÉTHODOLOGIE DE CLASSEMENT (Par ordre de priorité) :\n\nRECHERCHE DE RÉFÉRENCES EXACTES :\nScanne l'objet et le contenu pour trouver une affaire juridique spécifique ou un contexte pro précis.\n\nAffaires Juridiques — correspondance EXACTE requise :\n- \"CLIENT_JURIDIQUE_1\" ou \"référé provision\" → Label_2066904351082011065\n- \"AGM TEC\" ou \"référé expertise\" → Label_4074617951559200766\n- \"FORD TRANSIT\" ou \"expertise ford\" → Label_5266494009416745011\n- \"CLIENT_JURIDIQUE_2\" ou \"non concurrence\" → Label_6871182630302476523\n- \"CLIENT_JURIDIQUE_3\" ou \"référé permis\" → Label_7410096302240733424\n- \"CLIENT_JURIDIQUE_4\" ou \"prud'homme\" → Label_9038924767005744113\n- Juridique général sans référence exacte → Label_6137983776475129093\n\nContextes Pro — correspondance exacte :\n- \"VAV\" → Label_7625718522189934519\n- Adrien, site web, WordPress → Label_540509777898634867\n\nDÉDUCTION SÉMANTIQUE (DOMAINES RÉSERVÉS) :\nSi aucune référence exacte n'est trouvée, utilise ces correspondances logiques :\n- RH, contrat, salarié, embauche, paie, congés → Label_41 (Ressources Humaines)\n- Prospection sortante, démarchage, partenariat → Label_46 (Prospection)\n- Logiciel, abonnement, outil, SaaS, licence, support technique, badge, statistiques → Label_7954378272153982042 (Outils & Logiciels)\n- Webinaire, formation, conférence → Label_9004198069738018068 (Business Development/Webinaires)\n- Business development, développement commercial → Label_9187983965147565821 (Business Development)\n- Fournisseur, prestataire, facture fournisseur → Label_9208886135847648042 (FOURNISSEURS)\n\nLEADS ENTRANTS — règle stricte :\nUniquement les demandes de devis ou contacts clients entrants (particulier ou entreprise \nqui contacte MEA pour une prestation) → Label_7794235680266595855\n⚠️ Les emails de fournisseurs, outils SaaS ou prestataires qui démarchent MEA \nne sont PAS des leads entrants → classer dans Outils & Logiciels, Prospection \nou FOURNISSEURS selon le contexte.\n\nRÈGLE DE REPLI (FALLBACK) :\nSi un mail est ambigu ou ne correspond à aucun sous-dossier, utilise le dossier parent le plus proche parmi : JURIDIQUE, Business Development, ou Administration/VAV.\n\n📝 INSTRUCTIONS DE SORTIE (FORMAT JSON OBLIGATOIRE) :\nStructure JSON exigée :\n{\n  \"labelId\": \"L'ID exact du label choisi dans la liste\",\n  \"labelName\": \"Le nom clair du dossier correspondant à l'ID\",\n  \"formattedDate\": \"Le timestamp internalDate converti exactement au format JJ/MM/AAAA HH:mm\",\n  \"sender\": \"L'expéditeur brut de l'email\",\n  \"subject\": \"Le sujet brut de l'email\",\n  \"reason\": \"Justification du choix en 10 mots maximum en français\"\n}\n\n⚠️ RÈGLES DE SÉCURITÉ INFRANGIBLES :\nZÉRO INVENTION : Utilise uniquement un ID et un Nom présents dans la liste fournie.\nJSON PUR : Ta réponse doit commencer par { et finir par }. Pas de texte, pas de \\`\\`\\`json.\nLANGUE : Rédige le champ \"reason\" en français uniquement.\nPRÉCAUTION : Si l'email contient une urgence absolue (convocation, huissier, mise en demeure), utilise le dossier JURIDIQUE parent (Label_6137983776475129093).`;\n\nconst userMessage = `Expéditeur : ${$json.From}\nSujet : ${$json.Subject}\nContenu : ${$json.snippet}\nDate : ${$json.internalDate}`;\n\nreturn {\n  json: {\n    requestBody: JSON.stringify({\n      model: \"deepseek-chat\",\n      temperature: 0,\n      max_tokens: 10,\n      messages: [\n        { role: \"system\", content: systemPrompt },\n        { role: \"user\", content: \"ping\" }\n      ]\n    })\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2448, 128],
+      "id": "00504fed-5d25-4613-ae21-441f1bbf15c5",
+      "name": "Code JS - Chauffe cache"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2672, 64],
+      "id": "75c9236e-d368-4e20-ab4c-eda16657bacf",
+      "name": "API DeepSeek - Chauffe",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "TliXgPxpJQmgqDP0",
+          "name": "Google Search Console API"
+        },
+        "deepSeekApi": {
+          "id": "MBt6ozX97KVIAwcD",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const usage = $json.usage;\nconst cachedTokens = usage.prompt_cache_hit_tokens || 0;\nconst promptTokens = usage.prompt_tokens || 1;\nconst cacheRatio = cachedTokens / promptTokens;\n\nconst cacheChaud = cacheRatio > 0.7;\nconst tentatives = $('Chauffe Cache').item.json.tentatives || 0;\n\nreturn {\n  json: {\n    cache_chaud: cacheChaud || tentatives >= 3,\n    cache_ratio: Math.round(cacheRatio * 100),\n    cached_tokens: cachedTokens,\n    prompt_tokens: promptTokens,\n    tentatives: tentatives + 1\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2896, 64],
+      "id": "969cef92-12af-4b83-b330-20bc6048dab5",
+      "name": "Code JS - Vérifie cache"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cbca57dd-0c5d-4db5-9c0b-8bf99bbce01d",
+              "leftValue": "={{ $json.cache_chaud }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [3120, 64],
+      "id": "68e1e407-92b5-4b7a-920b-a799b1ca093b",
+      "name": "Si - Cache chaud"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3344, 224],
+      "id": "3ffc7ce7-f027-460a-bd63-7da198a42a98",
+      "name": "Attente - 2s retry",
+      "webhookId": "5adc90ba-f194-4c54-884f-41915d11e285"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    ...$json,\n    From: ($json.From || '')\n      .replace(/<[^>]*>/g, '')\n      .replace(/\"/g, '')\n      .trim(),\n    Subject: ($json.Subject || '')\n      .replace(/\"/g, \"'\")\n      .replace(/[\\r\\n]+/g, ' ')\n      .trim(),\n    snippet: ($json.snippet || '')\n      .replace(/[\\u034F\\u00AD\\u200B-\\u200D\\uFEFF]/g, '')\n      .replace(/͏/g, '')\n      .replace(/\"/g, \"'\")\n      .replace(/[\\r\\n]+/g, ' ')\n      .trim()\n      .substring(0, 500)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3344, 16],
+      "id": "3d6ad7c1-4526-4bc1-a49e-e6a4010687b8",
+      "name": "Code JS - Nettoie email"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const listesDossiers = $('Code JS - Filtre labels').item.json.liste_dossiers_texte;\n\nconst systemPrompt = `Tu es un automate d'analyse et de classification d'emails professionnels. Ta mission est d'analyser chaque email entrant de la société MEA, de déterminer son classement dans une arborescence stricte, et d'extraire les données nécessaires. Tu ne disposes d'aucun outil. Tu dois répondre UNIQUEMENT par un objet JSON valide, sans aucun texte avant ou après.\n\nLISTE STRICTE ET EXHAUSTIVE DES DOSSIERS AUTORISÉS (ID : Nom) :\n${listesDossiers}\n\n🛠 MÉTHODOLOGIE DE CLASSEMENT (Par ordre de priorité) :\n\nRECHERCHE DE RÉFÉRENCES EXACTES :\nScanne l'objet et le contenu pour trouver une affaire juridique spécifique ou un contexte pro précis.\n\nAffaires Juridiques — correspondance EXACTE requise :\n- \"CLIENT_JURIDIQUE_1\" ou \"référé provision\" → Label_2066904351082011065\n- \"AGM TEC\" ou \"référé expertise\" → Label_4074617951559200766\n- \"FORD TRANSIT\" ou \"expertise ford\" → Label_5266494009416745011\n- \"CLIENT_JURIDIQUE_2\" ou \"non concurrence\" → Label_6871182630302476523\n- \"CLIENT_JURIDIQUE_3\" ou \"référé permis\" → Label_7410096302240733424\n- \"CLIENT_JURIDIQUE_4\" ou \"prud'homme\" → Label_9038924767005744113\n- Juridique général sans référence exacte → Label_6137983776475129093\n\nContextes Pro — correspondance exacte :\n- \"VAV\" → Label_7625718522189934519\n- Adrien, site web, WordPress → Label_540509777898634867\n\nDÉDUCTION SÉMANTIQUE (DOMAINES RÉSERVÉS) :\nSi aucune référence exacte n'est trouvée, utilise ces correspondances logiques :\n- RH, contrat, salarié, embauche, paie, congés → Label_41 (Ressources Humaines)\n- Prospection sortante, démarchage, partenariat → Label_46 (Prospection)\n- Logiciel, abonnement, outil, SaaS, licence, support technique, badge, statistiques → Label_7954378272153982042 (Outils & Logiciels)\n- Webinaire, formation, conférence → Label_9004198069738018068 (Business Development/Webinaires)\n- Business development, développement commercial → Label_9187983965147565821 (Business Development)\n- Fournisseur, prestataire, facture fournisseur → Label_9208886135847648042 (FOURNISSEURS)\n\nLEADS ENTRANTS — règle stricte :\nUniquement les demandes de devis ou contacts clients entrants (particulier ou entreprise \nqui contacte MEA pour une prestation) → Label_7794235680266595855\n⚠️ Les emails de fournisseurs, outils SaaS ou prestataires qui démarchent MEA \nne sont PAS des leads entrants → classer dans Outils & Logiciels, Prospection \nou FOURNISSEURS selon le contexte.\n\nRÈGLE DE REPLI (FALLBACK) :\nSi un mail est ambigu ou ne correspond à aucun sous-dossier, utilise le dossier parent le plus proche parmi : JURIDIQUE, Business Development, ou Administration/VAV.\n\n📝 INSTRUCTIONS DE SORTIE (FORMAT JSON OBLIGATOIRE) :\nStructure JSON exigée :\n{\n  \"labelId\": \"L'ID exact du label choisi dans la liste\",\n  \"labelName\": \"Le nom clair du dossier correspondant à l'ID\",\n  \"formattedDate\": \"Le timestamp internalDate converti exactement au format JJ/MM/AAAA HH:mm\",\n  \"sender\": \"L'expéditeur brut de l'email\",\n  \"subject\": \"Le sujet brut de l'email\",\n  \"reason\": \"Justification du choix en 10 mots maximum en français\"\n}\n\n⚠️ RÈGLES DE SÉCURITÉ INFRANGIBLES :\nZÉRO INVENTION : Utilise uniquement un ID et un Nom présents dans la liste fournie.\nJSON PUR : Ta réponse doit commencer par { et finir par }. Pas de texte, pas de \\`\\`\\`json.\nLANGUE : Rédige le champ \"reason\" en français uniquement.\nPRÉCAUTION : Si l'email contient une urgence absolue (convocation, huissier, mise en demeure), utilise le dossier JURIDIQUE parent (Label_6137983776475129093).`;\n\nconst userMessage = `Expéditeur : ${$json.From}\nSujet : ${$json.Subject}\nContenu : ${$json.snippet}\nDate : ${$json.internalDate}`;\n\nreturn {\n  json: {\n    ...$json,\n    requestBody: JSON.stringify({\n      model: \"deepseek-chat\",\n      temperature: 0,\n      max_tokens: 500,\n      messages: [\n        { role: \"system\", content: systemPrompt },\n        { role: \"user\", content: userMessage }\n      ]\n    })\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3568, 16],
+      "id": "d8daa481-2149-4dcd-a76f-82109cdf8242",
+      "name": "Code JS - Build req classif"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const message = $json.choices[0].message;\nconst text = (message.content || message.reasoning_content || '').trim();\n\nif (!text) {\n  return { \n    json: { \n      error: true, \n      emailId: $json.id,\n      raw: 'content vide'\n    }\n  };\n}\n\n// Nettoyage\nconst cleaned = text\n  .replace(/^```json\\n?/, '')\n  .replace(/```$/, '')\n  .trim();\n\ntry {\n  return { json: JSON.parse(cleaned) };\n} catch(e) {\n  return { \n    json: { \n      error: true, \n      emailId: $json.id,\n      raw: cleaned\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4240, 16],
+      "id": "80c6fdb7-2829-4b0c-b3b1-a125e9d37fcb",
+      "name": "Code JS - Parse classif"
+    },
+    {
+      "parameters": {
+        "jsCode": "const emails = $input.all();\nconst nbEmails = emails.length;\n\n// Seuil : on chauffe le cache seulement si > 5 emails\nconst seuilChauffe = 0;\n\nreturn emails.map((item, index) => ({\n  json: {\n    ...item.json,\n    nb_emails: nbEmails,\n    chauffe_necessaire: nbEmails > seuilChauffe,\n    index: index\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1792, 128],
+      "id": "6a1e185f-1f3a-4a56-8334-e5f3aaafc252",
+      "name": "Code JS - Évalue nb emails"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "2c164e1d-18a0-40d3-ba70-eb21e6bf4bc6",
+              "leftValue": "={{ $json.nb_emails }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2000, 128],
+      "id": "62327ce5-c875-4ca1-9518-a8d857e4ca3b",
+      "name": "Si - Seuil nb emails"
+    }
+  ],
+  "connections": {
+    "Trigger - Tri Gmail EMAFUITES": {
+      "main": [[{ "node": "Get many labels", "type": "main", "index": 0 }]]
+    },
+    "Get many messages": {
+      "main": [[{ "node": "Trie - Par date", "type": "main", "index": 0 }]]
+    },
+    "Trie - Par date": {
+      "main": [[{ "node": "Limite - Emails", "type": "main", "index": 0 }]]
+    },
+    "Limite - Emails": {
+      "main": [[{ "node": "Get a thread", "type": "main", "index": 0 }]]
+    },
+    "Si - Email déjà classé": {
+      "main": [
+        [{ "node": "Add label to message", "type": "main", "index": 0 }],
+        [{ "node": "Code JS - Évalue nb emails", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code JS - Détecte dossiers": {
+      "main": [[{ "node": "Si - Email déjà classé", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Filtre labels": {
+      "main": [[{ "node": "Get many messages", "type": "main", "index": 0 }]]
+    },
+    "Get many labels": {
+      "main": [[{ "node": "Code JS - Filtre labels", "type": "main", "index": 0 }]]
+    },
+    "Add label to message": {
+      "main": [[{ "node": "Remove label from message1", "type": "main", "index": 0 }]]
+    },
+    "Get a thread": {
+      "main": [[{ "node": "Code JS - Détecte dossiers", "type": "main", "index": 0 }]]
+    },
+    "Remove label from message": {
+      "main": [[{ "node": "Append row in sheet1", "type": "main", "index": 0 }]]
+    },
+    "Add label to message1": {
+      "main": [[{ "node": "Remove label from message", "type": "main", "index": 0 }]]
+    },
+    "API DeepSeek - Classifie": {
+      "main": [[{ "node": "Code JS - Parse classif", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Prépare classif": {
+      "main": [[{ "node": "API DeepSeek - Classifie", "type": "main", "index": 0 }]]
+    },
+    "Si - Chauffe nécessaire": {
+      "main": [[{ "node": "Code JS - Chauffe cache", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Chauffe cache": {
+      "main": [[{ "node": "API DeepSeek - Chauffe", "type": "main", "index": 0 }]]
+    },
+    "API DeepSeek - Chauffe": {
+      "main": [[{ "node": "Code JS - Vérifie cache", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Vérifie cache": {
+      "main": [[{ "node": "Si - Cache chaud", "type": "main", "index": 0 }]]
+    },
+    "Si - Cache chaud": {
+      "main": [
+        [{ "node": "Code JS - Nettoie email", "type": "main", "index": 0 }],
+        [{ "node": "Attente - 2s retry", "type": "main", "index": 0 }]
+      ]
+    },
+    "Attente - 2s retry": {
+      "main": [[{ "node": "Code JS - Chauffe cache", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Nettoie email": {
+      "main": [[{ "node": "Code JS - Build req classif", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Build req classif": {
+      "main": [[{ "node": "Code JS - Prépare classif", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Parse classif": {
+      "main": [[{ "node": "Add label to message1", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Évalue nb emails": {
+      "main": [[{ "node": "Si - Seuil nb emails", "type": "main", "index": 0 }]]
+    },
+    "Si - Seuil nb emails": {
+      "main": [[{ "node": "Si - Chauffe nécessaire", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

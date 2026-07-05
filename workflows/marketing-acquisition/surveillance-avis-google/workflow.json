@@ -1,0 +1,207 @@
+{
+  "name": "Surveillance avis Google",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 30 }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, -96],
+      "id": "f8e350da-a7cf-495a-ab3c-25fda8c19b8a",
+      "name": "Trigger - Surveillance avis Google"
+    },
+    {
+      "parameters": {
+        "url": "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [224, -96],
+      "id": "2d7dc4fb-44e0-4ece-82c1-6541587af385",
+      "name": "API Google My Business - Comptes",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "TliXgPxpJQmgqDP0",
+          "name": "Google Search Console API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://mybusiness.googleapis.com/v4/{{ $json.accounts[0].name }}/locations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [448, -96],
+      "id": "fbc6142b-c529-47a6-bdf6-a0282df3cc3d",
+      "name": "API Google My Business - Lieux",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "TliXgPxpJQmgqDP0",
+          "name": "Google Search Console API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://mybusiness.googleapis.com/v4/{{ locationName }}/reviews?pageSize=10&orderBy=updateTime+desc",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [672, -96],
+      "id": "4968d0f8-7ead-4b0d-8750-cfffd6bb64a2",
+      "name": "API Google My Business - Avis",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "TliXgPxpJQmgqDP0",
+          "name": "Google Search Console API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const reviews = $input.first().json.reviews || [];\n\n// Récupère le timestamp de la dernière vérification\n// Stocké dans une variable n8n statique\nconst lastCheck = $getWorkflowStaticData('global').lastCheck || 0;\nconst now = Date.now();\n\n// Filtre les avis postés depuis la dernière vérification\nconst newReviews = reviews.filter(r => {\n  const reviewDate = new Date(r.updateTime).getTime();\n  return reviewDate > lastCheck;\n});\n\n// Met à jour le timestamp\n$getWorkflowStaticData('global').lastCheck = now;\n\nif (newReviews.length === 0) {\n  return [{ json: { hasNewReviews: false } }];\n}\n\nreturn newReviews.map(r => ({\n  json: {\n    hasNewReviews:  true,\n    reviewId:       r.reviewId,\n    reviewer:       r.reviewer.displayName,\n    rating:         r.starRating, // ONE TWO THREE FOUR FIVE\n    comment:        r.comment || '(sans commentaire)',\n    date:           new Date(r.updateTime).toLocaleDateString('fr-FR'),\n    ratingNumber:   { ONE:1, TWO:2, THREE:3, FOUR:4, FIVE:5 }[r.starRating]\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [896, -96],
+      "id": "b9b46f98-1059-444f-97dc-be515b497587",
+      "name": "Code JS - Filtre nouveaux avis"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 3, "leftValue": "", "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "000d5990-9e4e-4402-b876-3443c8a7c0a8",
+              "leftValue": false,
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1120, -96],
+      "id": "3f3433cf-13d3-413a-ba95-d832b33e0582",
+      "name": "Si - Nouveaux avis ?"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "claude-haiku-4-5-20251001"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Avis de {{ $json.reviewer }} — {{ $json.ratingNumber }}/5 étoiles :\\n{{ $json.comment }}"
+            }
+          ]
+        },
+        "options": {
+          "system": "Tu rédiges des réponses aux avis Google pour EMA Fuites, entreprise de détection de fuite d'eau dans les Hauts-de-France. Ton ton est professionnel, chaleureux et sincère. Pour les avis positifs (4-5 étoiles) : remercie personnellement, mentionne un détail de l'avis si possible, invite à revenir. Pour les avis négatifs (1-3 étoiles) : reste calme et professionnel, présente des excuses, propose de résoudre en privé (email ou téléphone). Réponds UNIQUEMENT avec le texte de la réponse, sans guillemets, sans introduction."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [1344, -96],
+      "id": "15611940-5a3a-4f8f-a4d8-426e69afa620",
+      "name": "Claude - Rédige réponse avis",
+      "credentials": {
+        "anthropicApi": {
+          "id": "RZVOt3bK3EJAJe4E",
+          "name": "CLE API LANDING RENO ANTHROPIC"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const review = $('Code JS - Filtre nouveaux avis').first().json;\nconst claudeResponse = $input.first().json.content[0].text;\n\nconst stars = '⭐'.repeat(review.ratingNumber) + \n              '☆'.repeat(5 - review.ratingNumber);\n\nconst emoji = review.ratingNumber >= 4 ? '🟢' : \n              review.ratingNumber >= 3 ? '🟡' : '🔴';\n\nconst message = \n`${emoji} <b>Nouvel avis Google — ${review.date}</b>\n\n${stars} <b>${review.reviewer}</b>\n💬 ${review.comment}\n\n<b>Réponse suggérée par Claude :</b>\n<i>${claudeResponse}</i>\n\n👉 Valider et publier : https://business.google.com`;\n\nreturn [{ json: { message, claudeResponse, review } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1696, -96],
+      "id": "03ffe23d-9aa8-4c4f-b5ae-b19323c4ee9b",
+      "name": "Code JS - Formate message"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1920, -96],
+      "id": "8b504f41-e07a-47d5-b120-755585e20acd",
+      "name": "Telegram - Envoie alerte avis",
+      "webhookId": "c1b8fdfe-db99-434e-a9a3-88a4fa9c8d5d",
+      "credentials": {
+        "telegramApi": {
+          "id": "MxotDkEtya5DiMOd",
+          "name": "RAPPORT_SEO_HEBDOMADAIRE_BOT"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Surveillance avis Google": {
+      "main": [[{ "node": "API Google My Business - Comptes", "type": "main", "index": 0 }]]
+    },
+    "API Google My Business - Comptes": {
+      "main": [[{ "node": "API Google My Business - Lieux", "type": "main", "index": 0 }]]
+    },
+    "API Google My Business - Lieux": {
+      "main": [[{ "node": "API Google My Business - Avis", "type": "main", "index": 0 }]]
+    },
+    "API Google My Business - Avis": {
+      "main": [[{ "node": "Code JS - Filtre nouveaux avis", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Filtre nouveaux avis": {
+      "main": [[{ "node": "Si - Nouveaux avis ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Nouveaux avis ?": {
+      "main": [[{ "node": "Claude - Rédige réponse avis", "type": "main", "index": 0 }]]
+    },
+    "Claude - Rédige réponse avis": {
+      "main": [[{ "node": "Code JS - Formate message", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Formate message": {
+      "main": [[{ "node": "Telegram - Envoie alerte avis", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

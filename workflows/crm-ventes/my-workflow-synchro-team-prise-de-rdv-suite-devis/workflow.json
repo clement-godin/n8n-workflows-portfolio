@@ -1,0 +1,81 @@
+{
+  "name": "My workflow SYNCHRO TEAM \"Prise de RDV suite Devis\"",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/creation-intervention",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, -144],
+      "id": "585e595f-ae35-44ad-9632-267e4ea6f968",
+      "name": "Webhook - Prise de RDV Devis",
+      "webhookId": "40b1a7ec-15ff-4a6f-a10e-dd8bc3fb60cf",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [224, -144],
+      "id": "22b12b13-4eb2-4a27-931e-04803f7bec97",
+      "name": "Webhook - Répond création intervention"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.antsroute.com/capi/order/search-availabilities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "cakey",
+              "value": "YOUR_ANTSROUTE_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"orderType\": \"SERVICE\", \n  \"duration\": 60, \n  \"address\": {\n    \"address\": \"1 rue de la Paix\",\n    \"zipCode\": \"59000\",\n    \"city\": \"Lille\",\n    \"country\": \"France\"\n  },\n  \"searchAvailabilitiesSettings\": {\n    \"startDate\": \"2026-03-02\", \n    \"endDate\": \"2026-03-06\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [480, -144],
+      "id": "47f04042-141e-4bbc-aba6-62a8f0c07f41",
+      "name": "API ANTS - Recherche disponibilités"
+    }
+  ],
+  "connections": {
+    "Webhook - Prise de RDV Devis": {
+      "main": [[{ "node": "Webhook - Répond création intervention", "type": "main", "index": 0 }]]
+    },
+    "Webhook - Répond création intervention": {
+      "main": [[{ "node": "API ANTS - Recherche disponibilités", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

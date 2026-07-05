@@ -1,0 +1,238 @@
+{
+  "name": "bot transcription audio OPEN AI whisper",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message", "callback_query"],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 64],
+      "id": "b4cb5161-db0e-4d18-8367-b28bf0915e6d",
+      "name": "Trigger - Bot transcription audio",
+      "webhookId": "f1709e5c-8e1b-4b1e-9bd6-2fbf6f0116e6",
+      "credentials": {
+        "telegramApi": {
+          "id": "ANwJJzGIjJRpbpNN",
+          "name": "Transcription_audio_n8n_clem_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [672, -32],
+      "id": "704b2e51-c772-449c-8a57-6ca4a2b8ff4f",
+      "name": "OpenAI - Transcrit audio vocal",
+      "credentials": {
+        "openAiApi": {
+          "id": "9LS6CDaep0lZZnNq",
+          "name": "OpenAi perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Bot transcription audio').item.json.message.chat.id }}",
+        "text": "=Voici ce que j'ai compris : {{ $json.text }}",
+        "replyMarkup": "inlineKeyboard",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [896, -32],
+      "id": "00ec0ad2-e64c-4878-b1a8-3c371d7461ff",
+      "name": "Telegram - Envoie transcription vocale",
+      "webhookId": "e5ad64e0-6957-4d4d-9e93-3e6b3695e9ec",
+      "credentials": {
+        "telegramApi": {
+          "id": "ANwJJzGIjJRpbpNN",
+          "name": "Transcription_audio_n8n_clem_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [448, -32],
+      "id": "2a609d1e-d120-4cea-aa05-4a35f74284ba",
+      "name": "Telegram - Récupère fichier vocal",
+      "webhookId": "8bc86937-70c6-466e-b6d6-5a980b488e36",
+      "credentials": {
+        "telegramApi": {
+          "id": "ANwJJzGIjJRpbpNN",
+          "name": "Transcription_audio_n8n_clem_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.voice.file_id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "msg audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b254b724-f5d9-452a-9468-9d38deb3c6a9",
+                    "leftValue": "={{ $json.message.audio.file_id }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "exists",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fichier audio"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [224, 64],
+      "id": "b3601402-c680-408b-8c0e-16da1d3e9f1b",
+      "name": "Switch - Type message audio"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [672, 160],
+      "id": "57b7662d-09c0-4f05-aa30-bf8bca276bfa",
+      "name": "OpenAI - Transcrit audio fichier",
+      "credentials": {
+        "openAiApi": {
+          "id": "9LS6CDaep0lZZnNq",
+          "name": "OpenAi perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Trigger - Bot transcription audio').item.json.message.chat.id }}",
+        "text": "=Voici ce que j'ai compris : {{ $json.text }}",
+        "replyMarkup": "inlineKeyboard",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [896, 160],
+      "id": "d42f756b-3fe4-4ac7-ac51-da770363cd31",
+      "name": "Telegram - Envoie transcription fichier",
+      "webhookId": "e5ad64e0-6957-4d4d-9e93-3e6b3695e9ec",
+      "credentials": {
+        "telegramApi": {
+          "id": "ANwJJzGIjJRpbpNN",
+          "name": "Transcription_audio_n8n_clem_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.audio.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [448, 160],
+      "id": "2595474e-1d66-4e6c-988f-743b7d5ebde1",
+      "name": "Telegram - Récupère fichier audio",
+      "webhookId": "8bc86937-70c6-466e-b6d6-5a980b488e36",
+      "credentials": {
+        "telegramApi": {
+          "id": "ANwJJzGIjJRpbpNN",
+          "name": "Transcription_audio_n8n_clem_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Bot transcription audio": {
+      "main": [[{ "node": "Switch - Type message audio", "type": "main", "index": 0 }]]
+    },
+    "OpenAI - Transcrit audio vocal": {
+      "main": [[{ "node": "Telegram - Envoie transcription vocale", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Récupère fichier vocal": {
+      "main": [[{ "node": "OpenAI - Transcrit audio vocal", "type": "main", "index": 0 }]]
+    },
+    "Switch - Type message audio": {
+      "main": [
+        [{ "node": "Telegram - Récupère fichier vocal", "type": "main", "index": 0 }],
+        [{ "node": "Telegram - Récupère fichier audio", "type": "main", "index": 0 }]
+      ]
+    },
+    "OpenAI - Transcrit audio fichier": {
+      "main": [[{ "node": "Telegram - Envoie transcription fichier", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Récupère fichier audio": {
+      "main": [[{ "node": "OpenAI - Transcrit audio fichier", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["BOT TELEGRAM", "CHAT BOT"]
+}

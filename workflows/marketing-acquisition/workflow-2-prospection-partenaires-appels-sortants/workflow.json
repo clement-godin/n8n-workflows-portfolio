@@ -1,0 +1,220 @@
+{
+  "name": "Workflow 2 — Prospection Partenaires — Appels Sortants",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": " 0 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0],
+      "id": "6658200b-8791-4384-a324-c295c11d99f8",
+      "name": "Trigger - Appels sortants partenaires"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [416, 0],
+      "id": "a4471cbf-5cd3-4322-9c30-8c76d47fd6f1",
+      "name": "Boucle - Deals partenaires"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "company",
+        "operation": "get",
+        "companyId": {
+          "__rl": true,
+          "value": "={{ $json.associations.companies.results[0].id }}",
+          "mode": "id"
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [624, 208],
+      "id": "9051e7e0-b2a7-4362-9a93-afe1257402f4",
+      "name": "HubSpot - Récupère company",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "search",
+        "limit": 20,
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "propertyName": "pipeline",
+                    "value": "Prospection Partenaires"
+                  },
+                  {
+                    "propertyName": "dealstage",
+                    "value": "À appeler"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "properties": [
+            "dealname",
+            "hs_primary_associated_company"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [208, 0],
+      "id": "89b0380f-e4b0-48ae-8b0e-11e508a1e086",
+      "name": "HubSpot - Deals à appeler",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $credentials.twilioApi.accountSid }}/Calls.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "To",
+              "value": "={{ $('HubSpot - Récupère company').item.json.properties.phone }}"
+            },
+            {
+              "name": "From",
+              "value": "+33600000000"
+            },
+            {
+              "name": "url",
+              "value": "=https://your-domain.com/twiml-partenaire-plombier?company_id={{ $('HubSpot - Récupère company').item.json.id }}&deal_id={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {}
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [832, 208],
+      "id": "ee452057-8ed7-4206-bbaf-6dc123bfa81b",
+      "name": "API Twilio - Déclenche appel Léa"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $('HubSpot - Deals à appeler').item.json.id }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "stage": ""
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [1040, 208],
+      "id": "9c276b9f-3984-4fa4-89ab-6fd6b55a45ec",
+      "name": "HubSpot - Màj deal après appel",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1248, 208],
+      "id": "ccf37601-ee64-4a9a-a569-b36f6a3edbdd",
+      "name": "Attente - Entre appels",
+      "webhookId": "aef27fda-55fd-4891-80c9-8e49a6d9ee90"
+    }
+  ],
+  "connections": {
+    "Trigger - Appels sortants partenaires": {
+      "main": [
+        [{ "node": "HubSpot - Deals à appeler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Boucle - Deals partenaires": {
+      "main": [
+        [],
+        [{ "node": "HubSpot - Récupère company", "type": "main", "index": 0 }]
+      ]
+    },
+    "HubSpot - Récupère company": {
+      "main": [
+        [{ "node": "API Twilio - Déclenche appel Léa", "type": "main", "index": 0 }]
+      ]
+    },
+    "HubSpot - Deals à appeler": {
+      "main": [
+        [{ "node": "Boucle - Deals partenaires", "type": "main", "index": 0 }]
+      ]
+    },
+    "API Twilio - Déclenche appel Léa": {
+      "main": [
+        [{ "node": "HubSpot - Màj deal après appel", "type": "main", "index": 0 }]
+      ]
+    },
+    "HubSpot - Màj deal après appel": {
+      "main": [
+        [{ "node": "Attente - Entre appels", "type": "main", "index": 0 }]
+      ]
+    },
+    "Attente - Entre appels": {
+      "main": [
+        [{ "node": "Boucle - Deals partenaires", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

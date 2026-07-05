@@ -1,0 +1,177 @@
+{
+  "name": "EMA — Archive Transcription Appel",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "your-webhook-path-uuid",
+        "options": {}
+      },
+      "name": "Webhook Twilio (call.completed)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "82a1d493-e35e-4463-a7c4-124306e7f125",
+      "webhookId": "your-webhook-path-uuid"
+    },
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            { "name": "call_sid" },
+            { "name": "direction" },
+            { "name": "from_phone" },
+            { "name": "to_phone" },
+            { "name": "duration_s" },
+            { "name": "recording_url" },
+            { "name": "recording_sid" },
+            { "name": "source" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Extraire données appel",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [224, 0],
+      "id": "8a63c50e-6c28-4db4-8cf4-47d055600565"
+    },
+    {
+      "parameters": { "amount": 10, "unit": "seconds" },
+      "name": "Attendre recording disponible",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [448, 0],
+      "id": "d77a3e49-7d08-4993-b32c-f04f7fc5c031"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Extraire données appel').item.json.recording_url }}.mp3",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {
+          "response": { "response": { "responseFormat": "file", "outputPropertyName": "audio_data" } }
+        }
+      },
+      "name": "Télécharger audio Twilio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [672, 0],
+      "id": "326be6b7-864d-40f4-9e23-5102ab2b04dd"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "audio_data",
+        "name": "={{ 'call_' + $('Extraire données appel').item.json.call_sid + '.mp3' }}",
+        "driveId": { "__rl": true, "value": "MY_DRIVE_ID", "mode": "id" },
+        "folderId": { "__rl": true, "value": "FOLDER_ID_TRANSCRIPTS_AUDIO", "mode": "id" },
+        "options": {}
+      },
+      "name": "Upload Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [896, 0],
+      "id": "da6d2b1f-62a8-4a5b-8d37-f38688054b1e",
+      "credentials": {
+        "googleDriveOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "Google Sheets account" }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://YOUR_NOVA_SONIC_ENDPOINT/transcript/{{ $('Extraire données appel').item.json.call_sid }}",
+        "options": {}
+      },
+      "name": "Récupérer transcript Nova Sonic",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [448, 192],
+      "id": "9e427f24-d535-445b-8145-f4f5d183f2d0",
+      "notes": "Adapter l'URL selon l'API Nova Sonic / Bedrock utilisée"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer YOUR_DEEPSEEK_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": { "parameters": [{}] },
+        "options": {}
+      },
+      "name": "Résumé LLM (DeepSeek)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [672, 192],
+      "id": "cd24b94f-c022-4174-ac15-4a3475015b52"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.item.json.choices[0].message.content;\nlet parsed;\ntry {\n  parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());\n} catch(e) {\n  parsed = { summary: raw.slice(0, 300), sentiment: 'neutre', outcome: 'autre' };\n}\nreturn [{ json: parsed }];"
+      },
+      "name": "Parser réponse LLM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [896, 192],
+      "id": "289bb22a-7c8d-44e0-b83e-81c3221082c1"
+    },
+    {
+      "parameters": { "mode": "combine", "combinationMode": "mergeByIndex", "options": {} },
+      "name": "Merge données",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [1120, 96],
+      "id": "c3ff7515-2292-4386-b7bb-cbcdf538bad3"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO call_transcripts (\n  source,\n  direction,\n  twilio_call_sid,\n  phone,\n  duration_s,\n  twilio_recording_url,\n  audio_drive_file_id,\n  audio_drive_url,\n  audio_format,\n  transcript,\n  summary,\n  sentiment,\n  outcome,\n  started_at\n) VALUES (\n  '{{ $json.source }}',\n  '{{ $json.direction }}',\n  '{{ $json.call_sid }}',\n  '{{ $json.from_phone }}',\n  {{ $json.duration_s }},\n  '{{ $json.recording_url }}',\n  '{{ $json.audio_drive_file_id }}',\n  'https://drive.google.com/uc?export=download&id={{ $json.audio_drive_file_id }}',\n  'mp3',\n  $1,\n  $2,\n  '{{ $json.sentiment }}',\n  '{{ $json.outcome }}',\n  NOW() - INTERVAL '{{ $json.duration_s }} seconds'\n)\nON CONFLICT (twilio_call_sid) DO UPDATE SET\n  transcript = EXCLUDED.transcript,\n  summary = EXCLUDED.summary,\n  sentiment = EXCLUDED.sentiment,\n  outcome = EXCLUDED.outcome,\n  audio_drive_file_id = EXCLUDED.audio_drive_file_id,\n  audio_drive_url = EXCLUDED.audio_drive_url,\n  updated_at = NOW()\nRETURNING id",
+        "options": {}
+      },
+      "name": "INSERT PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1344, 96],
+      "id": "edd84a66-952b-4416-bd3f-b43a0c4a056d",
+      "credentials": {
+        "postgres": { "id": "9r90D1udv0rR4VEu", "name": "Postgres account" }
+      },
+      "notes": "ON CONFLICT sur twilio_call_sid = idempotent, safe à rejouer"
+    },
+    {
+      "parameters": { "resource": "engagement", "type": "CALL", "additionalFields": {} },
+      "name": "HubSpot — Créer engagement Call",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [1568, 96],
+      "id": "e9f3f924-4035-45b1-856b-4ee6b610bdcc",
+      "credentials": {
+        "hubspotApi": { "id": "JnaOUFzIE4lA3O1R", "name": "HubSpot account" }
+      },
+      "notes": "Ajouter contact/deal ID dans associations si hubspot_contact_id est connu"
+    }
+  ],
+  "connections": {
+    "Webhook Twilio (call.completed)": { "main": [[{ "node": "Extraire données appel", "type": "main", "index": 0 }]] },
+    "Extraire données appel": { "main": [[{ "node": "Attendre recording disponible", "type": "main", "index": 0 }]] },
+    "Attendre recording disponible": { "main": [[{ "node": "Télécharger audio Twilio", "type": "main", "index": 0 }]] },
+    "Télécharger audio Twilio": { "main": [[{ "node": "Upload Drive", "type": "main", "index": 0 }]] },
+    "Upload Drive": { "main": [[{ "node": "Merge données", "type": "main", "index": 0 }]] },
+    "Récupérer transcript Nova Sonic": { "main": [[{ "node": "Résumé LLM (DeepSeek)", "type": "main", "index": 0 }]] },
+    "Résumé LLM (DeepSeek)": { "main": [[{ "node": "Parser réponse LLM", "type": "main", "index": 0 }]] },
+    "Parser réponse LLM": { "main": [[{ "node": "Merge données", "type": "main", "index": 1 }]] },
+    "Merge données": { "main": [[{ "node": "INSERT PostgreSQL", "type": "main", "index": 0 }]] },
+    "INSERT PostgreSQL": { "main": [[{ "node": "HubSpot — Créer engagement Call", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": ["IA & OUTILS", "NOVA SONIC"]
+}

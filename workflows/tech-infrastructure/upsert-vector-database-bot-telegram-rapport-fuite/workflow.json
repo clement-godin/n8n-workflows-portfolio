@@ -1,0 +1,355 @@
+{
+  "name": "UPSERT VECTOR DATABASE BOT TELEGRAM RAPPORT FUITE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [304, 96],
+      "id": "2f0b5370-6cd8-4e26-9b64-ff500aec096e",
+      "name": "Drive - Télécharge PDF",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [528, 96],
+      "id": "f725ab54-10db-496f-89dc-e0655fd283cd",
+      "name": "Prépare - Extrait texte PDF"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "n8n-rapport-fuite",
+          "mode": "list",
+          "cachedResultName": "n8n-rapport-fuite"
+        },
+        "embeddingBatchSize": 100,
+        "options": {
+          "pineconeNamespace": "={{ 'expertises-mea-fuite' }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [1008, 96],
+      "id": "da78d4e3-0220-4382-a460-721f5191c892",
+      "name": "Pinecone - Upsert rapports",
+      "credentials": {
+        "pineconeApi": {
+          "id": "XXjUj5PLNb97FQba",
+          "name": "PineconeApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [976, 320],
+      "id": "3baa58c7-e1bf-4ccc-a296-c146c06b92ec",
+      "name": "OpenAI - Embeddings",
+      "credentials": {
+        "openAiApi": {
+          "id": "9LS6CDaep0lZZnNq",
+          "name": "OpenAi perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let resultItems = [];\n\nfor (const item of $input.all()) {\n  let rawText = item.json.text;\n\n  if (rawText) { \n    let textToClean = rawText;\n\n    // 1. NETTOYAGE CLASSIQUE\n    textToClean = textToClean.replace(/^[\\s\\S]*?(?=1\\. CONCLUSION)/i, '');\n    textToClean = textToClean.replace(/MEA - Siège social[\\s\\S]*?www\\.mea-tech\\.fr/gi, '');\n    textToClean = textToClean.replace(/^\\s*\\d+\\/\\d+\\s*$/gm, '');\n    textToClean = textToClean.replace(/Rapport Recherche de fuites.*/gi, '');\n    textToClean = textToClean.replace(/Expertise n°.*/gi, '');\n    textToClean = textToClean.replace(/Basés à Bordeaux[\\s\\S]*?\\+33600000000/gi, '');\n    textToClean = textToClean.replace(/M\\.E\\.A|M\\.E\\.4|Μ\\.Ε\\.Α/gi, '');\n    textToClean = textToClean.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g, '');\n    textToClean = textToClean.replace(/\\n/g, ' ');\n    textToClean = textToClean.replace(/ {2,}/g, ' ');\n    textToClean = textToClean.trim();\n\n    // 2. EXTRACTION DES BLOCS GLOBAUX (Le Contexte)\n    // On attrape tout de \"1. CONCLUSION\" jusqu'à \"3. DÉSORDRES\"\n    let conclusionMatch = textToClean.match(/1\\. CONCLUSION.*?(?=3\\. D[EÉ]SORDRES)/i);\n    let conclusionText = conclusionMatch ? conclusionMatch[0].trim() : \"Conclusion non trouvée.\";\n\n    // On attrape tout de \"3. DÉSORDRES\" (avec toutes les constatations) jusqu'à \"Investigation 1\"\n    let desordresMatch = textToClean.match(/3\\. D[EÉ]SORDRES.*?(?=Investigation 1)/i);\n    let desordresText = desordresMatch ? desordresMatch[0].trim() : \"Désordres non trouvés.\";\n\n    // 3. EXTRACTION DES INVESTIGATIONS INDIVIDUELLES\n    // On isole la fin du texte qui contient toutes les investigations\n    let indexDebutInvest = textToClean.indexOf(\"Investigation 1\");\n    if (indexDebutInvest !== -1) {\n      let texteInvestigations = textToClean.substring(indexDebutInvest);\n      \n      // On découpe par Investigation\n      let investigations = texteInvestigations.split(/(?=Investigation \\d+\\s*-)/gi);\n\n      // 4. ASSEMBLAGE DES \"SUPER-MORCEAUX\"\n      for (let inv of investigations) {\n        inv = inv.trim();\n        \n        if (inv.length > 20) {\n          // C'est ICI la magie : on fusionne le contexte et l'investigation !\n          let superChunk = `=== CONCLUSION DU RAPPORT ===\\n${conclusionText}\\n\\n=== CONTEXTE ET CONSTATATIONS ===\\n${desordresText}\\n\\n=== DÉTAIL DE L'INVESTIGATION ===\\n${inv}`;\n\n          resultItems.push({\n            json: {\n              text: superChunk\n            }\n          });\n        }\n      }\n    } else {\n      // Sécurité : si le mot \"Investigation 1\" n'est pas trouvé, on envoie tout d'un coup\n      resultItems.push({ json: { text: textToClean } });\n    }\n  }\n}\n\nif (resultItems.length === 0) {\n  return [{ json: { erreur: \"Texte introuvable ou illisible.\" } }];\n}\n\nreturn resultItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [752, 96],
+      "id": "778d0f1b-60e1-4903-b355-39c205051809",
+      "name": "Code JS - Découpe rapport"
+    },
+    {
+      "parameters": {
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [1104, 320],
+      "id": "c6e9569d-656f-44d9-a949-6e75173bd618",
+      "name": "Charge - Docs texte"
+    },
+    {
+      "parameters": {
+        "chunkSize": 5000,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [1184, 528],
+      "id": "f86c108e-f43c-4ab9-8121-a5d123f14fb3",
+      "name": "Découpe - Texte récursif"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+            "mode": "list",
+            "cachedResultName": "RAPPORT A ARCHIVER",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_DRIVE_FOLDER_ID"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-144, 192],
+      "id": "06a640bb-a280-4292-a7cb-cb2669588751",
+      "name": "Drive - Cherche PDFs à traiter",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-368, 192],
+      "id": "382f4007-7e06-4b29-842c-8b1a85d578e3",
+      "name": "Trigger - Upsert vecteurs PDF"
+    },
+    {
+      "parameters": {
+        "operation": "copy",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "name": "={{ $json.name }}",
+        "sameFolder": false,
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+          "mode": "list",
+          "cachedResultName": "RAPPORT ARCHIVER",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_DRIVE_FOLDER_ID"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [304, 288],
+      "id": "3555641c-afaf-4d80-9542-0df7867001c8",
+      "name": "Drive - Copie vers archivés",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "maxItems": 10
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [80, 192],
+      "id": "1e2168ea-0e20-49c4-801d-304d6b775740",
+      "name": "Limite - 10 fichiers"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Limite - 10 fichiers').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "deletePermanently": false
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [528, 288],
+      "id": "7bd02700-d096-43f2-b8db-f16b8f59d758",
+      "name": "Drive - Supprime original",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "retRXJnEB8w6LRgr",
+          "name": "connexion google sheet emafuites"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Drive - Télécharge PDF": {
+      "main": [
+        [
+          {
+            "node": "Prépare - Extrait texte PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prépare - Extrait texte PDF": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Découpe rapport",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone - Upsert rapports",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Découpe rapport": {
+      "main": [
+        [
+          {
+            "node": "Pinecone - Upsert rapports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Charge - Docs texte": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone - Upsert rapports",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Découpe - Texte récursif": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Charge - Docs texte",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone - Upsert rapports": {
+      "main": [[]]
+    },
+    "Drive - Cherche PDFs à traiter": {
+      "main": [
+        [
+          {
+            "node": "Limite - 10 fichiers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger - Upsert vecteurs PDF": {
+      "main": [
+        [
+          {
+            "node": "Drive - Cherche PDFs à traiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive - Copie vers archivés": {
+      "main": [
+        [
+          {
+            "node": "Drive - Supprime original",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limite - 10 fichiers": {
+      "main": [
+        [
+          {
+            "node": "Drive - Télécharge PDF",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Drive - Copie vers archivés",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

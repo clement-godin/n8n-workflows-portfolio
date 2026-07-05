@@ -1,0 +1,864 @@
+{
+  "name": "BACK UP NOTION",
+  "active": false,
+  "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {}
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -3808,
+          80
+        ],
+        "id": "1b8837a8-af96-4ad1-b1ac-50fe903343e0",
+        "name": "Trigger - Backup Notion"
+      },
+      {
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "getAll",
+          "databaseId": {
+            "__rl": true,
+            "value": "={{ $json.url.slice(-32) }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "simple": false,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          -1568,
+          80
+        ],
+        "id": "ce1b1d21-851a-4a29-822a-fbcc1f53ed97",
+        "name": "Get many database pages",
+        "retryOnFail": true,
+        "waitBetweenTries": 3000,
+        "credentials": {
+          "notionApi": {
+            "id": "tBArA7034KB3iCxQ",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Récupère tous les items (pages) entrants\nconst items = $input.all();\n\n// On boucle sur chaque page\nfor (const item of items) {\n  const properties = item.json.properties;\n  let pageTitle = '';\n  let filesToDownload = [];\n\n  // S'assurer que properties existe (sécurité)\n  if (properties) {\n    // 1. Boucle sur toutes les propriétés pour trouver le TITRE et les FICHIERS\n    for (const propName in properties) {\n      const prop = properties[propName];\n\n      // --- Trouve la propriété TITRE ---\n      if (prop.type === 'title') {\n        if (prop.title && prop.title.length > 0) {\n          pageTitle = prop.title.map(t => t.plain_text).join('');\n        }\n      }\n\n      // --- Trouve les propriétés FICHIERS ---\n      if (prop.type === 'files' && prop.files && prop.files.length > 0) {\n        for (const file of prop.files) {\n          const url = file.type === 'file' ? file.file.url : file.external.url;\n          filesToDownload.push({ \n            name: file.name, \n            url: url \n          });\n        }\n      }\n    }\n  }\n\n  // 2. Ajoute les résultats dans des champs faciles à utiliser\n  item.json.pageTitle = pageTitle || 'Page_Sans_Titre_' + item.json.id;\n  item.json.filesToDownload = filesToDownload;\n}\n\nreturn items;"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -1120,
+          80
+        ],
+        "id": "303a6a5b-ac74-4abf-8076-f78e081c0e74",
+        "name": "Code JS - Extrait titres",
+        "executeOnce": false
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "ca16c7ed-60f2-4180-ab13-a100aba301ea",
+                "leftValue": "={{ $json.filesToDownload.length",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -448,
+          80
+        ],
+        "id": "6495fc07-57fb-41f7-9baa-2fb44daa41f5",
+        "name": "Si - Fichiers à télécharger"
+      },
+      {
+        "parameters": {
+          "url": "={{ $('Split Out').item.json.filesToDownload.url }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.3,
+        "position": [
+          448,
+          96
+        ],
+        "id": "de5a92f6-6c88-474c-9d85-cb983d31054f",
+        "name": "API HTTP - Télécharge fichier"
+      },
+      {
+        "parameters": {
+          "resource": "database",
+          "operation": "getAll",
+          "returnAll": true,
+          "simple": false
+        },
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          -2688,
+          80
+        ],
+        "id": "46e87cd2-457b-4790-bee6-b776a40e3a86",
+        "name": "Get many databases1",
+        "retryOnFail": true,
+        "waitBetweenTries": 3000,
+        "credentials": {
+          "notionApi": {
+            "id": "tBArA7034KB3iCxQ",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resource": "block",
+          "operation": "getAll",
+          "blockId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          },
+          "returnAll": true,
+          "simplifyOutput": false
+        },
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2.2,
+        "position": [
+          -896,
+          80
+        ],
+        "id": "458e6d17-f8bb-436e-b306-0c26023bb472",
+        "name": "Get many child blocks",
+        "executeOnce": false,
+        "retryOnFail": true,
+        "waitBetweenTries": 3000,
+        "credentials": {
+          "notionApi": {
+            "id": "tBArA7034KB3iCxQ",
+            "name": "Notion account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// 1. Récupération des données\nconst allBlocks = $input.all();\n// ⚠️ Vérifiez que ce nom correspond à votre nœud de liste des pages (N°4)\nconst allPages = $items(\"Code JS - Extrait titres\"); \n// ⚠️ Vérifiez que ce nom correspond à votre nœud de fusion (celui avec les IDs Drive)\nconst mergedData = $items(\"Merge - Notion + Drive\"); \n\n// --- A. Carte des Dossiers (ID Notion -> ID Drive) ---\nconst folderMap = {};\nfor (const item of mergedData) {\n    // On cherche l'ID Notion (soit dans 'id', soit dans l'URL si écrasé)\n    let notionId = item.json.id;\n    if (notionId && !notionId.includes('-') && item.json.url) {\n        notionId = item.json.url.slice(-32);\n    }\n    // On cherche l'ID Drive (renommé 'driveFolderId' ou dans le 2ème id)\n    const driveId = item.json.driveFolderId || item.json.id; \n    \n    if (notionId && driveId) folderMap[notionId] = driveId;\n}\n\n// --- B. Tri des blocs par page ---\nconst blocksByPage = {};\nfor (const item of allBlocks) {\n    const block = item.json;\n    if (block?.parent?.type === 'page_id') {\n        const pid = block.parent.page_id;\n        if (!blocksByPage[pid]) blocksByPage[pid] = [];\n        blocksByPage[pid].push(block);\n    }\n}\n\nconst results = [];\n\n// --- C. Boucle Principale sur les 83 pages ---\nfor (const pageItem of allPages) {\n    const pageId = pageItem.json.id;\n    \n    // 1. Nettoyage du Titre\n    let pageTitle = pageItem.json.pageTitle || `Page_${pageId}`;\n    // Si le titre est un tableau (cas rare), on prend le texte\n    if (Array.isArray(pageTitle) && pageTitle.length > 0) pageTitle = pageTitle[0];\n    pageTitle = typeof pageTitle === 'string' ? pageTitle.replace(/[\\/\\\\|:?\"*<>]/g, \"_\").trim() : `Page_${pageId}`;\n    \n    // 2. Identification du Dossier Parent\n    const parentDbId = pageItem.json.parent ? pageItem.json.parent.database_id : \"Inconnu\";\n    // On récupère l'ID du dossier \"Base de Données\" (ex: dossier 'Clients')\n    const dbFolderId = folderMap[parentDbId] || \"\"; \n\n    // 3. Construction du JSON Complet (Master File)\n    const pageBlocks = blocksByPage[pageId] || [];\n    const fullPageData = {\n        meta: {\n            id: pageId,\n            title: pageTitle,\n            database_id: parentDbId,\n            url: pageItem.json.url,\n            created_time: pageItem.json.created_time,\n            properties: pageItem.json.properties || {}\n        },\n        content: {\n            total_blocks: pageBlocks.length,\n            blocks: pageBlocks.map(b => b.json)\n        }\n    };\n    \n    // Conversion en Binaire\n    const jsonString = JSON.stringify(fullPageData, null, 2);\n    const binaryData = Buffer.from(jsonString).toString('base64');\n\n    // 4. Extraction des fichiers à télécharger (Propriétés + Blocs)\n    const filesList = [];\n    \n    // a) Fichiers dans les Propriétés\n    const props = pageItem.json.properties || {};\n    for (const key in props) {\n        if (props[key].type === 'files' && props[key].files) {\n            for (const file of props[key].files) {\n                const url = file.file?.url || file.external?.url;\n                if (url) filesList.push({ url: url, name: `PROP_${file.name}` });\n            }\n        }\n    }\n    \n    // b) Fichiers dans les Blocs\n    for (const block of pageBlocks) {\n        if (['image', 'file', 'pdf', 'video'].includes(block.type)) {\n            const content = block[block.type];\n            const url = content.file?.url || content.external?.url;\n            if (url) {\n                let name = content.caption?.[0]?.plain_text || `${block.type}_${block.id}`;\n                // Ajout extension basique si absente\n                if (!name.includes('.')) name += block.type === 'pdf' ? '.pdf' : '.png';\n                filesList.push({ url: url, name: `BLOC_${name}` });\n            }\n        }\n    }\n\n    // 5. Sortie de l'item\n    results.push({\n        json: {\n            pageTitle: pageTitle,\n            dbFolderId: dbFolderId, // C'est la variable pour le dossier parent !\n            filesToDownload: filesList\n        },\n        binary: {\n            data: {\n                data: binaryData,\n                mimeType: 'application/json',\n                fileExtension: 'json',\n                fileName: `${pageTitle}_Full.json`\n            }\n        }\n    });\n}\n\nreturn results;"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          -672,
+          80
+        ],
+        "id": "5f93d4aa-4ab9-4963-a211-72349e065b22",
+        "name": "Code JS - Construit JSON pages"
+      },
+      {
+        "parameters": {
+          "amount": 1
+        },
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          -1792,
+          80
+        ],
+        "id": "6d2012be-d95d-4417-b11f-6cd9b96253e1",
+        "name": "Attente - Rate limit DB",
+        "webhookId": "04ecd0b0-78ad-47c9-850b-b1a738673c8f"
+      },
+      {
+        "parameters": {
+          "amount": 1
+        },
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          -1344,
+          80
+        ],
+        "id": "cdce636d-42ee-4adc-995c-c16df4bc5ecd",
+        "name": "Attente - Rate limit pages",
+        "webhookId": "b69afa32-0d76-4140-945a-145bf94742ac"
+      },
+      {
+        "parameters": {
+          "resource": "fileFolder",
+          "queryString": "=Backup_Notion_{{ $today.format('dd-MM-yyyy') }}",
+          "filter": {},
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -3584,
+          80
+        ],
+        "id": "912dc505-40a3-42a0-bd50-38c65e6ae4d0",
+        "name": "Search files and folders",
+        "alwaysOutputData": true,
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "vRsXCsE5abdK8R6i",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "54ccca6f-ce8c-4d66-98eb-a52f4acfa866",
+                "leftValue": "={{ $json.id }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "exists",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -3360,
+          80
+        ],
+        "id": "9d8505be-0c64-4967-96d9-cae4f78c6e2e",
+        "name": "Si - Dossier backup existe"
+      },
+      {
+        "parameters": {
+          "resource": "folder",
+          "name": "=Backup_Notion_{{ $today.format('dd-MM-yyyy') }}",
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "YOUR_GOOGLE_DRIVE_BACKUP_FOLDER_ID",
+            "mode": "list",
+            "cachedResultName": "BACK UP NOTION",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/YOUR_GOOGLE_DRIVE_BACKUP_FOLDER_ID"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -3136,
+          144
+        ],
+        "id": "399b9cb4-461f-4440-be51-480ebddc5d1c",
+        "name": "Create folder",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "vRsXCsE5abdK8R6i",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "resource": "folder",
+          "name": "={{ $now.format('HH') + 'h' + $now.format('mm') }}",
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id}}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -2912,
+          80
+        ],
+        "id": "a6ea9a13-15bb-4070-b578-50f39a1699a5",
+        "name": "Create folder2",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "vRsXCsE5abdK8R6i",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "inputDataFieldName": "=data",
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.dbFolderId ? $json.dbFolderId : $('Create folder2').first().json.id }}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          0,
+          288
+        ],
+        "id": "9c1a34ed-2b74-4860-8e23-83d21529c526",
+        "name": "Upload file",
+        "retryOnFail": false,
+        "waitBetweenTries": 3000,
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "vRsXCsE5abdK8R6i",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "messageUi": {},
+          "additionalFields": {}
+        },
+        "type": "n8n-nodes-base.googleChat",
+        "typeVersion": 1,
+        "position": [
+          224,
+          288
+        ],
+        "id": "a62b8db4-4b6e-4015-ba11-bbbcaf2e7604",
+        "name": "Create a message",
+        "webhookId": "409abdca-637d-44ca-b342-cc5e8fa7fda5",
+        "disabled": true
+      },
+      {
+        "parameters": {
+          "amount": 1
+        },
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [
+          -224,
+          288
+        ],
+        "id": "cb86e7c6-2549-4c2b-ad51-806040da5816",
+        "name": "Attente - Avant upload",
+        "webhookId": "b69afa32-0d76-4140-945a-145bf94742ac"
+      },
+      {
+        "parameters": {
+          "resource": "folder",
+          "name": "={{ $('Get many databases1').item.json.title[0].text.content }}",
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Create folder2').item.json.id }}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -2464,
+          144
+        ],
+        "id": "69115e7d-a80d-40ae-9509-303167231f64",
+        "name": "Create folder1",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "vRsXCsE5abdK8R6i",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "mode": "combine",
+          "combineBy": "combineByPosition",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          -2016,
+          80
+        ],
+        "id": "3fe48c76-8763-4233-9b39-c6325f0116a4",
+        "name": "Merge - Notion + Drive"
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "83ced738-dd0a-4617-8cec-bae458059003",
+                "name": "driveFolderId",
+                "value": "={{ $json.id }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          -2240,
+          144
+        ],
+        "id": "2f800ead-6d91-46c1-a6c9-2fac0bc1663f",
+        "name": "Prépare - ID dossier Drive"
+      },
+      {
+        "parameters": {
+          "resource": "folder",
+          "name": "={{ $json.pageTitle }}",
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.dbFolderId }}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -224,
+          96
+        ],
+        "id": "6376bfcb-5d0f-4cc7-8afb-3fc8bc95bab6",
+        "name": "Create folder3",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "vRsXCsE5abdK8R6i",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "fieldToSplitOut": "=filesToDownload",
+          "include": "allOtherFields",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitOut",
+        "typeVersion": 1,
+        "position": [
+          224,
+          96
+        ],
+        "id": "1671c3b3-9ab8-4c19-91ca-2d482f18dc87",
+        "name": "Split Out"
+      },
+      {
+        "parameters": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $('Create folder3').item.json.id }}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          672,
+          96
+        ],
+        "id": "4380a26b-b550-488c-801b-1b8d45983924",
+        "name": "Upload file1",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "vRsXCsE5abdK8R6i",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          224,
+          -96
+        ],
+        "id": "64276b7e-c56f-4a77-bad2-9a946cfc94b4",
+        "name": "Upload file2",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "vRsXCsE5abdK8R6i",
+            "name": "Google Drive account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "mode": "combine",
+          "combineBy": "combineByPosition",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          0,
+          0
+        ],
+        "id": "f6698c69-875c-40d3-9bab-ca7fefd150fd",
+        "name": "Merge - JSON dossier page"
+      }
+  ],
+  "connections": {
+      "Trigger - Backup Notion": {
+        "main": [
+          [
+            {
+              "node": "Search files and folders",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get many database pages": {
+        "main": [
+          [
+            {
+              "node": "Attente - Rate limit pages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code JS - Extrait titres": {
+        "main": [
+          [
+            {
+              "node": "Get many child blocks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Si - Fichiers à télécharger": {
+        "main": [
+          [
+            {
+              "node": "Create folder3",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Merge - JSON dossier page",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Attente - Avant upload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get many databases1": {
+        "main": [
+          [
+            {
+              "node": "Create folder1",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Merge - Notion + Drive",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get many child blocks": {
+        "main": [
+          [
+            {
+              "node": "Code JS - Construit JSON pages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code JS - Construit JSON pages": {
+        "main": [
+          [
+            {
+              "node": "Si - Fichiers à télécharger",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "API HTTP - Télécharge fichier": {
+        "main": [
+          [
+            {
+              "node": "Upload file1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Attente - Rate limit DB": {
+        "main": [
+          [
+            {
+              "node": "Get many database pages",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Attente - Rate limit pages": {
+        "main": [
+          [
+            {
+              "node": "Code JS - Extrait titres",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Search files and folders": {
+        "main": [
+          [
+            {
+              "node": "Si - Dossier backup existe",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Si - Dossier backup existe": {
+        "main": [
+          [
+            {
+              "node": "Create folder2",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Create folder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create folder": {
+        "main": [
+          [
+            {
+              "node": "Create folder2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create folder2": {
+        "main": [
+          [
+            {
+              "node": "Get many databases1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upload file": {
+        "main": [
+          [
+            {
+              "node": "Create a message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Attente - Avant upload": {
+        "main": [
+          [
+            {
+              "node": "Upload file",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create folder1": {
+        "main": [
+          [
+            {
+              "node": "Prépare - ID dossier Drive",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Merge - Notion + Drive": {
+        "main": [
+          [
+            {
+              "node": "Attente - Rate limit DB",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prépare - ID dossier Drive": {
+        "main": [
+          [
+            {
+              "node": "Merge - Notion + Drive",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Create folder3": {
+        "main": [
+          [
+            {
+              "node": "Merge - JSON dossier page",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Split Out": {
+        "main": [
+          [
+            {
+              "node": "API HTTP - Télécharge fichier",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Upload file2": {
+        "main": [
+          []
+        ]
+      },
+      "Merge - JSON dossier page": {
+        "main": [
+          [
+            {
+              "node": "Upload file2",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Split Out",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+  },
+  "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false
+  }
+}

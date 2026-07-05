@@ -1,0 +1,438 @@
+{
+  "name": "RELANCE DEVIS AUTOMATIQUE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours" }]
+        }
+      },
+      "id": "576aba1a-aa98-48f4-b865-2428340699db",
+      "name": "Trigger - Relance devis",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [256, 352]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"filterGroups\": [{\"filters\": [{\"propertyName\": \"dealstage\", \"operator\": \"EQ\", \"value\": \"qualifiedtobuy\"}, {\"propertyName\": \"a_relancer_manuellement\", \"operator\": \"NOT_HAS_PROPERTY\"}]}, {\"filters\": [{\"propertyName\": \"dealstage\", \"operator\": \"EQ\", \"value\": \"qualifiedtobuy\"}, {\"propertyName\": \"a_relancer_manuellement\", \"operator\": \"EQ\", \"value\": \"false\"}]}], \"properties\": [\"dealname\", \"dealstage\", \"hs_lastmodifieddate\", \"nb_relances\", \"derniere_relance\", \"a_relancer_manuellement\"], \"sorts\": [{\"propertyName\": \"hs_lastmodifieddate\", \"direction\": \"ASCENDING\"}], \"limit\": 100}",
+        "options": {}
+      },
+      "id": "83dd2738-0003-4549-8833-0bc674d57b26",
+      "name": "HubSpot - Deals devis envoyé",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [480, 352],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Filter deals needing follow-up\nconst items = $input.all();\nconst toProcess = [];\n\nfor (const item of items) {\n  const deals = item.json.results || [];\n  for (const d of deals) {\n    const props = d.properties || {};\n    const lastModified = new Date(props.hs_lastmodifieddate || props.createdate);\n    const derniereRelance = props.derniere_relance ? new Date(props.derniere_relance) : null;\n    const nbRelances = parseInt(props.nb_relances || '0');\n    const now = new Date();\n    \n    // Use derniere_relance if set, otherwise hs_lastmodifieddate\n    const referenceDate = derniereRelance || lastModified;\n    const daysSince = (now - referenceDate) / (1000 * 60 * 60 * 24);\n    \n    // J+2 (nbRelances = 0): need 2+ days since last modification, no relance yet\n    // J+5 (nbRelances = 1): need 3+ more days since first relance (total ~5 days)\n    // J+10 (nbRelances = 2): need 5+ more days since second relance (total ~10 days)\n    \n    let shouldRelance = false;\n    if (nbRelances === 0 && daysSince >= 2) shouldRelance = true;\n    else if (nbRelances === 1 && daysSince >= 3) shouldRelance = true;\n    else if (nbRelances === 2 && daysSince >= 5) shouldRelance = true;\n    \n    if (shouldRelance) {\n      toProcess.push({ json: {\n        dealId: d.id,\n        dealName: props.dealname || '',\n        nbRelances: nbRelances\n      }});\n    }\n  }\n}\n\nif (toProcess.length === 0) return [];\nreturn toProcess;\n"
+      },
+      "id": "19b40981-ca2c-4ab6-b34c-59f5f7c2baa6",
+      "name": "Code JS - Filtre deals à relancer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [704, 352],
+      "notes": "Filtre J+2 / J+5 / J+10 selon nb_relances et derniere_relance"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hubapi.com/crm/v3/objects/deals/{{ $json.dealId }}/associations/contacts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "id": "a62e3c4e-497d-492c-983d-9d1c6d3016a2",
+      "name": "HubSpot - Get associations contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [928, 352],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Merge deal info with contact info\nconst deal = $('Code JS - Filtre deals à relancer').item.json;\nconst associations = $input.first().json;\nconst contactIds = associations?.results || [];\n\nif (contactIds.length === 0) {\n  return [{ json: { ...deal, hasContact: false } }];\n}\n\nreturn [{ json: { ...deal, contactId: contactIds[0].id, hasContact: true } }];\n"
+      },
+      "id": "19d1f8a5-4652-42a7-8446-e1549b6f743d",
+      "name": "Code JS - Extraire contact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1152, 352]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.hasContact }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "condition-1781283242984-41nlrr1kk"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b77e8018-5096-4d0b-b0e5-7e195563efa8",
+      "name": "Si - A un contact",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1376, 352]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contactId }}?properties=firstname,phone,email",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "id": "a1a7ac73-4ea5-4190-8c72-9b3c7f6cbb1f",
+      "name": "HubSpot - Get contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1600, 352],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst deal = $('Code - Extraire contact').item.json;\nconst contact = $input.first().json.properties || {};\nconst prenom = contact.firstname || 'cher client';\nconst phone = contact.phone || '';\nconst email = contact.email || '';\n\nlet tel = phone.replace(/[\\s\\-\\.\\(\\)]/g, '');\nif (tel.startsWith('0')) tel = '33' + tel.slice(1);\nif (tel && !tel.startsWith('+')) tel = '+' + tel;\n\nreturn [{ json: { ...deal, prenom, phone: tel, email, hasPhone: !!phone } }];\n"
+      },
+      "id": "c19e7c9d-ad0d-4181-9913-6de8c2e444c6",
+      "name": "Code JS - Données contact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1824, 352]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.nbRelances }}",
+                    "rightValue": 0,
+                    "operator": { "type": "number", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "0"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.nbRelances }}",
+                    "rightValue": 1,
+                    "operator": { "type": "number", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "1"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.nbRelances }}",
+                    "rightValue": 2,
+                    "operator": { "type": "number", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "2"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6bf09e24-66bc-4d52-9698-d7abad4e4870",
+      "name": "Switch - Canal de relance",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [2048, 336]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_WHATSAPP_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"messaging_product\": \"whatsapp\", \"recipient_type\": \"individual\", \"to\": \"{{ $json.phone }}\", \"type\": \"text\", \"text\": {\"preview_url\": false, \"body\": \"Bonjour {{ $('Code JS - Données contact').item.json.prenom }}, suite à votre demande de détection de fuite, je voulais vérifier si vous aviez des questions sur le devis que nous vous avons envoyé. Nous restons disponibles pour intervenir rapidement. EMA Fuites 📞\"}}",
+        "options": {}
+      },
+      "id": "a45bd77d-9c8c-4297-ab53-43b0b8357742",
+      "name": "WhatsApp - Relance J+2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2272, 160],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Votre devis EMA Fuites — Avez-vous des questions ?",
+        "message": "=Bonjour {{ $('Code JS - Données contact').item.json.prenom }},<br><br>Nous avons eu le plaisir de vous adresser un devis pour votre problème de fuite et souhaitons nous assurer que vous avez bien reçu toutes les informations nécessaires.<br><br>Si vous avez des questions ou souhaitez ajuster notre proposition, n'hésitez pas à nous contacter. Nous restons disponibles pour intervenir rapidement sur votre secteur.<br><br>Bien cordialement,<br><b>L'équipe EMA Fuites</b><br>📞 Détection de fuites non destructive — Nord / Hauts-de-France",
+        "options": {}
+      },
+      "id": "2bec2300-d8ed-4adb-acce-c4075e33059d",
+      "name": "Gmail - Relance J+5",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2272, 352],
+      "webhookId": "ef614013-064b-4031-bc33-2034d2173db8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5KWmGq134q2eiYyC",
+          "name": "COMPTE GMAIL EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=⏰ <b>Relance manuelle requise</b>\n\nDeal : <b>{{ $json.dealName }}</b>\n👤 {{ $json.prenom }}\n📞 {{ $json.phone }}\n\n2 relances automatiques envoyées sans réponse.\n👉 Intervention manuelle recommandée.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "4fa85d03-9080-4b4d-b153-36a5ee02629e",
+      "name": "Telegram - Alerte commercial J+10",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2272, 544],
+      "webhookId": "d22f6200-4cd1-48c8-9935-5cbd87eab383",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// After sending the relance, update HubSpot properties\nconst deal = $('Code JS - Données contact').item.json;\nconst nbRelances = deal.nbRelances || 0;\n\nreturn [{ json: {\n  dealId: deal.dealId,\n  nb_relances: nbRelances + 1,\n  derniere_relance: new Date().toISOString(),\n  isJ10: nbRelances === 2\n}}];\n"
+      },
+      "id": "f291e5e5-f97e-4e00-a6b4-673d6bad8909",
+      "name": "Code JS - Prépare mise à jour",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2496, 352]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/deals/{{ $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"nb_relances\": \"{{ $json.nb_relances }}\", \"derniere_relance\": \"{{ $json.derniere_relance }}\"}}",
+        "options": {}
+      },
+      "id": "49fccaf7-7f55-46b9-bedb-5d04d2cc2938",
+      "name": "HubSpot - Update nb_relances",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2944, 256],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      },
+      "notes": "Met à jour nb_relances et derniere_relance après chaque envoi"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/deals/{{ $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"nb_relances\": \"{{ $json.nb_relances }}\", \"derniere_relance\": \"{{ $json.derniere_relance }}\", \"a_relancer_manuellement\": \"true\"}}",
+        "options": {}
+      },
+      "id": "7f4789ab-f78e-49fe-bde8-0c3f557ab08a",
+      "name": "HubSpot - Tag relance manuelle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2944, 448],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "engagement",
+        "type": "NOTE",
+        "additionalFields": {}
+      },
+      "id": "60ce8d59-319d-47bf-bc72-5e8c2ec9a991",
+      "name": "HubSpot - Create note relance",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [3168, 352],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isJ10 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "condition-1781283242984-tfkqyqqia"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7e8d52a7-a71f-46a7-88f9-6b4d65099695",
+      "name": "Si - Est J10",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2720, 352]
+    }
+  ],
+  "connections": {
+    "Trigger - Relance devis": {
+      "main": [[{ "node": "HubSpot - Deals devis envoyé", "type": "main", "index": 0 }]]
+    },
+    "HubSpot - Deals devis envoyé": {
+      "main": [[{ "node": "Code JS - Filtre deals à relancer", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Filtre deals à relancer": {
+      "main": [[{ "node": "HubSpot - Get associations contact", "type": "main", "index": 0 }]]
+    },
+    "HubSpot - Get associations contact": {
+      "main": [[{ "node": "Code JS - Extraire contact", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Extraire contact": {
+      "main": [[{ "node": "Si - A un contact", "type": "main", "index": 0 }]]
+    },
+    "Si - A un contact": {
+      "main": [
+        [{ "node": "HubSpot - Get contact", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "HubSpot - Get contact": {
+      "main": [[{ "node": "Code JS - Données contact", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Données contact": {
+      "main": [[{ "node": "Switch - Canal de relance", "type": "main", "index": 0 }]]
+    },
+    "Switch - Canal de relance": {
+      "main": [
+        [{ "node": "WhatsApp - Relance J+2", "type": "main", "index": 0 }],
+        [{ "node": "Gmail - Relance J+5", "type": "main", "index": 0 }],
+        [{ "node": "Telegram - Alerte commercial J+10", "type": "main", "index": 0 }]
+      ]
+    },
+    "WhatsApp - Relance J+2": {
+      "main": [[{ "node": "Code JS - Prépare mise à jour", "type": "main", "index": 0 }]]
+    },
+    "Gmail - Relance J+5": {
+      "main": [[{ "node": "Code JS - Prépare mise à jour", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Alerte commercial J+10": {
+      "main": [[{ "node": "Code JS - Prépare mise à jour", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Prépare mise à jour": {
+      "main": [[{ "node": "Si - Est J10", "type": "main", "index": 0 }]]
+    },
+    "HubSpot - Update nb_relances": {
+      "main": [[{ "node": "HubSpot - Create note relance", "type": "main", "index": 0 }]]
+    },
+    "Si - Est J10": {
+      "main": [
+        [{ "node": "HubSpot - Tag relance manuelle", "type": "main", "index": 0 }],
+        [{ "node": "HubSpot - Update nb_relances", "type": "main", "index": 0 }]
+      ]
+    },
+    "HubSpot - Tag relance manuelle": {
+      "main": [[{ "node": "HubSpot - Create note relance", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  },
+  "tags": ["HUBSPOT", "CRM & VENTES"]
+}

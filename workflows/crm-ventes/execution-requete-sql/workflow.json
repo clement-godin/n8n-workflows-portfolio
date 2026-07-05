@@ -1,0 +1,57 @@
+{
+  "name": "EXECUTION REQUETE SQL",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0ddc45c1-a122-4302-841b-2c2a14800e03",
+      "name": "Trigger - Requête SQL manuelle"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE from devis ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        0
+      ],
+      "id": "f5ac9dc5-1cb3-40f6-9010-a4bc0cf151e9",
+      "name": "PostgreSQL - Exécute requête",
+      "credentials": {
+        "postgres": {
+          "id": "9r90D1udv0rR4VEu",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Requête SQL manuelle": {
+      "main": [
+        [
+          {
+            "node": "PostgreSQL - Exécute requête",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

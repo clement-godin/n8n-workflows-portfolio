@@ -1,0 +1,217 @@
+{
+  "name": "MAJ DEAL HUBSPOT SUITE SIGNATURE",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "VOTRE_UUID_WEBHOOK_SIGNATURE",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, -96],
+      "id": "c8828a35-4365-4af7-9f6a-8cc21ffe9ca5",
+      "name": "Webhook - Signature complète",
+      "webhookId": "VOTRE_UUID_WEBHOOK_SIGNATURE"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "d5dc674b-86f5-479c-b416-a91decb06230",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "envelope.completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [224, -96],
+      "id": "f90ad594-5886-42c2-8091-c3a19e031ed9",
+      "name": "Si - Signature complète ?"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.signatureapi.com/v1/envelopes/{{ $('Webhook - Signature complète').item.json.body.data.envelope_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "YOUR_SIGNATUREAPI_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [672, -96],
+      "id": "1e5189e1-6c79-43c0-8db3-81108f44de44",
+      "name": "API SignatureAPI - Récupère envelope"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.deliverable.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "YOUR_SIGNATUREAPI_KEY"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [896, -96],
+      "id": "487a302d-e95f-4371-ae63-b8e5e182c73c",
+      "name": "API SignatureAPI - Télécharge PDF signé"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hubapi.com/files/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "data",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "folderPath",
+              "value": "/devis_signes"
+            },
+            {
+              "name": "options",
+              "value": "={\"access\": \"PRIVATE\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1120, -96],
+      "id": "063151d9-0e26-4057-8fdf-224a13459fe0",
+      "name": "API HubSpot - Upload PDF signé",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.hubapi.com/crm/v3/objects/notes",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"hs_note_body\": \"✅ Devis signé numériquement par le client (via SignatureAPI).\",\n    \"hs_attachment_ids\": \"{{ $json.id }}\" \n  },\n  \"associations\": [\n    {\n      \"to\": {\n        \"id\": \"{{ $('Webhook - Signature complète').item.json.body.data.envelope_metadata.hubspot_deal_id }}\"\n      },\n      \"types\": [\n        {\n          \"associationCategory\": \"HUBSPOT_DEFINED\",\n          \"associationTypeId\": 214\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1344, -96],
+      "id": "e3886819-ffce-4347-96d6-07f6ae542425",
+      "name": "API HubSpot - Crée note deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "VOTRE_DEAL_ID_HUBSPOT",
+          "mode": "list",
+          "cachedResultName": "Client Test - Devis"
+        },
+        "updateFields": {
+          "stage": "contractsent",
+          "pipeline": ""
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [416, -128],
+      "id": "0c2cd135-ad34-4052-bc37-0fb845e421a0",
+      "name": "HubSpot - Màj deal signé",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Signature complète": {
+      "main": [[{ "node": "Si - Signature complète ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Signature complète ?": {
+      "main": [[{ "node": "HubSpot - Màj deal signé", "type": "main", "index": 0 }]]
+    },
+    "API SignatureAPI - Récupère envelope": {
+      "main": [[{ "node": "API SignatureAPI - Télécharge PDF signé", "type": "main", "index": 0 }]]
+    },
+    "API SignatureAPI - Télécharge PDF signé": {
+      "main": [[{ "node": "API HubSpot - Upload PDF signé", "type": "main", "index": 0 }]]
+    },
+    "API HubSpot - Upload PDF signé": {
+      "main": [[{ "node": "API HubSpot - Crée note deal", "type": "main", "index": 0 }]]
+    },
+    "HubSpot - Màj deal signé": {
+      "main": [[{ "node": "API SignatureAPI - Récupère envelope", "type": "main", "index": 0 }]]
+    },
+    "API HubSpot - Crée note deal": {
+      "main": [[]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

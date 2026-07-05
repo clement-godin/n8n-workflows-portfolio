@@ -1,0 +1,481 @@
+{
+    "name": "EMA - CLASSIFICATEUR PERSONA",
+    "active": false,
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours"
+                        }
+                    ]
+                }
+            },
+            "id": "c1dddf7a-74d7-4ad3-9c63-2bc697133d9e",
+            "name": "Schedule - Toutes les heures",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                256,
+                304
+            ]
+        },
+        {
+            "parameters": {
+                "documentId": {
+                    "__rl": true,
+                    "mode": "id",
+                    "value": "REMPLACER_PAR_ID_GOOGLE_SHEET_PROSPECTS_EMAFUITES"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "mode": "name",
+                    "value": "Prospects"
+                },
+                "options": {}
+            },
+            "id": "f2704812-663f-4b3e-a247-cba4c93ae602",
+            "name": "GSheets - Lire Prospects",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.7,
+            "position": [
+                464,
+                304
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "rCFvQBVaQVzg9Lrq",
+                    "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const items = $input.all();\nconst res = items.filter(i => i.json.Statut === 'NOUVEAU');\nreturn res.length > 0 ? res : [];"
+            },
+            "id": "255eb084-eab8-49bb-817a-0639766a9be9",
+            "name": "Code - Filtrer NOUVEAU",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                656,
+                304
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "1fcce804-c0b6-409c-99f0-624d6bf0c127",
+                            "leftValue": "={{ $input.all().length }}",
+                            "rightValue": 0,
+                            "operator": {
+                                "type": "number",
+                                "operation": "gt"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "16885341-e6f2-44e1-a9ed-f761e91f5a13",
+            "name": "IF - Prospects NOUVEAU",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                864,
+                304
+            ]
+        },
+        {
+            "parameters": {},
+            "id": "ead9a6ad-6b76-4306-b742-ac072074f5b3",
+            "name": "NoOp - Aucun prospect",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                1056,
+                512
+            ]
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "3bc04b91-fdcc-4a31-98d8-10bf960c3c0d",
+            "name": "Loop - Un par un",
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [
+                1056,
+                304
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const item = $input.first().json;\nconst prompt = `Classifie ce prospect B2B pour une soci\u00e9t\u00e9 de d\u00e9tection de fuites d'eau non destructive dans le Nord de la France (Hauts-de-France). R\u00e9ponds UNIQUEMENT en JSON valide sans backticks.\n\nDonn\u00e9es prospect :\n- Nom : ${item.Nom || ''}\n- Entreprise : ${item.Entreprise || ''}\n- Poste : ${item.Poste || ''}\n- Ville : ${item.Ville || ''}\n\nPersonas :\nA = D\u00e9cideur direct : g\u00e9rant/directeur de syndic, responsable technique bailleur social, directeur patrimoine, facility manager\nB = Prescripteur : expert sinistre assurance, plombier/chauffagiste partenaire potentiel, bureau d'\u00e9tudes\nC = Op\u00e9rationnel : assistant de gestion, charg\u00e9 de copropri\u00e9t\u00e9 junior, technicien\nD = Hors cible : concurrent d\u00e9tection fuites, \u00e9tudiant, hors secteur immobilier/assurance\n\nR\u00e9ponds : {\"persona\": \"A|B|C|D\", \"raison\": \"explication courte en 1 phrase\"}`;\nreturn [{json: {...item, claudeBody: {model: \"claude-sonnet-4-6\", max_tokens: 1000, messages: [{role: \"user\", content: prompt}]}}}];"
+            },
+            "id": "f904c2d9-99e1-4ee7-837f-51543f0ce1a0",
+            "name": "Code - Pr\u00e9parer Classify",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1264,
+                304
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.anthropic.com/v1/messages",
+                "authentication": "predefinedCredentialType",
+                "nodeCredentialType": "anthropicApi",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "anthropic-version",
+                            "value": "2023-06-01"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json.claudeBody) }}",
+                "options": {}
+            },
+            "id": "b26f07dc-a9c8-48f7-b46f-d71efa69e1e3",
+            "name": "Claude - Classifier Persona",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                1456,
+                304
+            ],
+            "credentials": {
+                "anthropicApi": {
+                    "id": "8Wcb8jgMTJM6CQjM",
+                    "name": "Anthropic account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const resp = $input.first().json;\nconst orig = $('Code - Pr\u00e9parer Classify').item.json;\nlet parsed;\ntry { parsed = JSON.parse(resp.content[0].text); }\ncatch(e) { parsed = {persona: 'D', raison: 'Erreur parsing'}; }\nreturn [{json: {...orig, persona_result: parsed.persona, raison_result: parsed.raison}}];"
+            },
+            "id": "c72ad016-e29e-4bd9-9d99-c224b2785962",
+            "name": "Code - Parser Persona",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1664,
+                304
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                    },
+                    "conditions": [
+                        {
+                            "id": "0ea3353a-1d7b-4cd5-9c7b-a742e964f75c",
+                            "leftValue": "={{ $json.persona_result }}",
+                            "rightValue": "D",
+                            "operator": {
+                                "type": "string",
+                                "operation": "equals"
+                            }
+                        }
+                    ],
+                    "combinator": "and"
+                },
+                "options": {}
+            },
+            "id": "e4704561-4cf1-4e83-b4db-72c65edc93b7",
+            "name": "IF - Persona D",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2.2,
+            "position": [
+                1856,
+                304
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "mode": "id",
+                    "value": "REMPLACER_PAR_ID_GOOGLE_SHEET_PROSPECTS_EMAFUITES"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "mode": "name",
+                    "value": "Prospects"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "ID": "={{ $json.ID }}",
+                        "Persona": "={{ $json.persona_result }}",
+                        "Statut": "\u00c9CART\u00c9",
+                        "Notes": "={{ $json.raison_result }}"
+                    },
+                    "matchingColumns": [
+                        "ID"
+                    ],
+                    "schema": []
+                },
+                "options": {}
+            },
+            "id": "96e3df4c-b800-4bb1-bee2-ab94c0f17546",
+            "name": "GSheets - \u00c9carter",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.7,
+            "position": [
+                2064,
+                208
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "rCFvQBVaQVzg9Lrq",
+                    "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "documentId": {
+                    "__rl": true,
+                    "mode": "id",
+                    "value": "REMPLACER_PAR_ID_GOOGLE_SHEET_PROSPECTS_EMAFUITES"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "mode": "name",
+                    "value": "Prospects"
+                },
+                "columns": {
+                    "mappingMode": "defineBelow",
+                    "value": {
+                        "ID": "={{ $json.ID }}",
+                        "Persona": "={{ $json.persona_result }}",
+                        "Statut": "CLASSIFI\u00c9",
+                        "Notes": "={{ $json.raison_result }}"
+                    },
+                    "matchingColumns": [
+                        "ID"
+                    ],
+                    "schema": []
+                },
+                "options": {}
+            },
+            "id": "7c43b98f-920c-4fc9-8a3c-b0cd4739cea6",
+            "name": "GSheets - Classifier",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4.7,
+            "position": [
+                2064,
+                400
+            ],
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "rCFvQBVaQVzg9Lrq",
+                    "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://your-domain.com/webhook/ema-scoring",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({row_id: $json.ID}) }}",
+                "options": {}
+            },
+            "id": "66996d17-2d65-4771-9831-6415f9623c30",
+            "name": "HTTP - D\u00e9clencher W2 Scoring",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.4,
+            "position": [
+                2256,
+                400
+            ]
+        }
+    ],
+    "connections": {
+        "Schedule - Toutes les heures": {
+            "main": [
+                [
+                    {
+                        "node": "GSheets - Lire Prospects",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GSheets - Lire Prospects": {
+            "main": [
+                [
+                    {
+                        "node": "Code - Filtrer NOUVEAU",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Code - Filtrer NOUVEAU": {
+            "main": [
+                [
+                    {
+                        "node": "IF - Prospects NOUVEAU",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IF - Prospects NOUVEAU": {
+            "main": [
+                [
+                    {
+                        "node": "Loop - Un par un",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "NoOp - Aucun prospect",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop - Un par un": {
+            "main": [
+                [
+                    {
+                        "node": "Code - Pr\u00e9parer Classify",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Code - Pr\u00e9parer Classify": {
+            "main": [
+                [
+                    {
+                        "node": "Claude - Classifier Persona",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Claude - Classifier Persona": {
+            "main": [
+                [
+                    {
+                        "node": "Code - Parser Persona",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Code - Parser Persona": {
+            "main": [
+                [
+                    {
+                        "node": "IF - Persona D",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "IF - Persona D": {
+            "main": [
+                [
+                    {
+                        "node": "GSheets - \u00c9carter",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "GSheets - Classifier",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GSheets - \u00c9carter": {
+            "main": [
+                [
+                    {
+                        "node": "Loop - Un par un",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "GSheets - Classifier": {
+            "main": [
+                [
+                    {
+                        "node": "HTTP - D\u00e9clencher W2 Scoring",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "HTTP - D\u00e9clencher W2 Scoring": {
+            "main": [
+                [
+                    {
+                        "node": "Loop - Un par un",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "saveManualExecutions": true,
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false,
+        "executionOrder": "v1",
+        "binaryMode": "separate",
+        "timeSavedMode": "fixed",
+        "errorWorkflow": "wg0YurkUmY4jQap6"
+    },
+    "tags": [
+        "MARKETING",
+        "PROSPECTION LinkedIn"
+    ]
+}

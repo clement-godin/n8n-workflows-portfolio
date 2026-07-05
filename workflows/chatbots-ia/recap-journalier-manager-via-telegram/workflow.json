@@ -1,0 +1,395 @@
+{
+  "name": "RECAP JOURNALIER MANAGER VIA TELEGRAM",
+  "active": true,
+  "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 12,20 * * *"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          -80
+        ],
+        "id": "40d8e558-a78a-42d6-8543-eba5f5a92821",
+        "name": "Trigger - Récap journalier"
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $json.prompt_data }}",
+          "messages": {
+            "messageValues": [
+              {
+                "message": "=Tu es l'assistant de direction de Clément. Ton rôle est de transformer ses notes vocales brutes en un point de fin de journée pour son associé, l'associé. l'associé est très intelligent (solides bases en droit et gestion) mais souffre d'une surcharge cognitive sévère. Il a une aversion totale pour les \"pavés\" de texte. Il exige la règle du \"coupe-circuit\" : clarté visuelle extrême, aucun blabla, sérialisation stricte.\n\nRègle 1 : L'Anti-Pavé (Style SMS & Télégraphique)\n\nBannis le style \"Newsletter\", l'enrobage et les phrases complètes (Sujet-Verbe-Complément). Rédige comme un SMS pro, direct, en style télégraphique. Utilise le tutoiement.\n\nRègle des 3 infos : Ne garde que Quoi ? (l'action/le problème) / Combien ? (l'argent) / Quand ? (la date). Supprime tout le reste du contexte.\n\nUtilise maximum 1 à 2 emojis par bloc pour rendre le texte \"scannable\" (ex: ⚡, 💧, 🚚, ⚠️).\n\nUn sujet = un bloc de 3 lignes maximum.\n\nRègle 2 : Transparence Opérationnelle (Le Sherpa)\n\nSois purement factuel. Précise l'action faite par Clément pour neutraliser le problème en 3 mots (ex: \"Appel fait, en attente retour lundi\").\n\nNe dis jamais que \"tout est réglé\" si ce n'est pas le cas.\n\nRègle 3 : Traitement strict des Finances (\"À payer\")\n\nSi la note mentionne des éléments financiers, ne fais AUCUNE phrase.\n\nPrésente cela sous forme de liste ultra-minimaliste : 💰 [Sujet/Quoi] - [Montant] - [Délai éventuel].\n\nN'invente JAMAIS qu'un paiement a été \"décaissé\" s'il est seulement \"à payer\". L'associé garde toujours la validation finale.\n\nRègle 4 : Délégation et Clôture (Zéro Charge Mentale)\n\nIsole les validations à la fin sous \"📌 Besoin de ton GO\".\n\nNe pose que des questions fermées (binaire : oui/non, choix A/B). Ne lui demande jamais son avis ouvert ou des solutions.\n\n\nRègle 5 : Interdiction de converser (Zéro Filler)\nNe dis JAMAIS \"Bonjour\", \"Voici le résumé\", ou \"N'hésite pas si tu as des questions\". Ton texte généré doit commencer directement par la première ligne d'information et s'arrêter net après la question binaire.\n\nEXEMPLE DE RENDU ATTENDU :\n📍 Client Test (Ville Test)\n⚡ ÉLEC : Devis Immocens refusé (hors budget). Veut des goulottes.\n💧 SDB/CUISINE : Cherche artisan pose + plomberie. Clés fin mai.\n🎯 Action : Attend son appel lundi aprèm pour lister les travaux.\n\n📌 Besoin de ton GO\n💰 Leroy Merlin (Matériel plomberie) - 150€\n👉 Est-ce que je lance le devis élec de notre côté avec des goulottes ? (Oui / Non)"
+              }
+            ]
+          },
+          "batching": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.chainLlm",
+        "typeVersion": 1.9,
+        "position": [
+          896,
+          -80
+        ],
+        "id": "dd0b2908-00c2-47b2-bff2-b7428983de3d",
+        "name": "DeepSeek - Génère récap journalier"
+      },
+      {
+        "parameters": {
+          "jsCode": "let notesCompilees = \"\";\nfor (const item of $input.all()) {\n  let heure = item.json.heure;\n  let texte = item.json['note transcript'];\n  notesCompilees += `- Note de ${heure} : ${texte}\\n`;\n}\nreturn [{ json: { prompt_data: notesCompilees } }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          672,
+          -80
+        ],
+        "id": "21abeea4-2909-4cd7-a1b6-6d93fd38912d",
+        "name": "Code JS - Compile notes"
+      },
+      {
+        "parameters": {
+          "chatId": "YOUR_TELEGRAM_CHAT_ID",
+          "text": "={{ $json.text }}",
+          "additionalFields": {
+            "appendAttribution": false
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1248,
+          -80
+        ],
+        "id": "e8eeca44-8aed-4e02-bd92-c29af66f7eaa",
+        "name": "Telegram - Envoie récap",
+        "webhookId": "e9e6d336-49e5-4477-ac69-0a85a66e38e9",
+        "credentials": {
+          "telegramApi": {
+            "id": "zCGc5Cv5TDV2CkNA",
+            "name": "@assistant_trancript_vocal_bot"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Cela va chercher toutes les lignes trouvées au début du workflow\nreturn $('Sheets - Récupère notes à envoyer').all();"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1472,
+          -80
+        ],
+        "id": "1fb7c8c4-c583-438c-8cb9-8ff34ec087bb",
+        "name": "Code JS - Récupère lignes"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 3,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "conditions": [
+              {
+                "id": "b4eeb739-84a1-48d3-a809-f442d04e818d",
+                "leftValue": "={{ $json.row_number }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          448,
+          -80
+        ],
+        "id": "67f34dad-b75e-4dfa-a3d9-d4a5886a6271",
+        "name": "Si - Notes à envoyer ?"
+      },
+      {
+        "parameters": {
+          "documentId": {
+            "__rl": true,
+            "value": "YOUR_GOOGLE_SHEET_ID",
+            "mode": "list",
+            "cachedResultName": "liste des notes transcript",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "gid=0",
+            "mode": "list",
+            "cachedResultName": "Feuille 1",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+          },
+          "filtersUI": {
+            "values": [
+              {
+                "lookupColumn": "statut",
+                "lookupValue": "A ENVOYER"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.7,
+        "position": [
+          224,
+          -80
+        ],
+        "id": "3c218df9-91a0-45a0-a85b-88c167306ff3",
+        "name": "Sheets - Récupère notes à envoyer",
+        "alwaysOutputData": true,
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "rCFvQBVaQVzg9Lrq",
+            "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "documentId": {
+            "__rl": true,
+            "value": "YOUR_GOOGLE_SHEET_ID",
+            "mode": "list",
+            "cachedResultName": "liste des notes transcript",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+          },
+          "sheetName": {
+            "__rl": true,
+            "value": "gid=0",
+            "mode": "list",
+            "cachedResultName": "Feuille 1",
+            "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "statut": "ENVOYER",
+              "row_number": "={{ $json.row_number }}"
+            },
+            "matchingColumns": [
+              "row_number"
+            ],
+            "schema": [
+              {
+                "id": "date",
+                "displayName": "date",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "heure",
+                "displayName": "heure",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "note transcript",
+                "displayName": "note transcript",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "statut",
+                "displayName": "statut",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "row_number",
+                "displayName": "row_number",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "readOnly": true,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4.7,
+        "position": [
+          1696,
+          -80
+        ],
+        "id": "c0eccd1c-d8c3-4de9-a1ee-6960644839c3",
+        "name": "Sheets - Marque notes envoyées",
+        "credentials": {
+          "googleSheetsOAuth2Api": {
+            "id": "rCFvQBVaQVzg9Lrq",
+            "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "model": "deepseek-v4-flash",
+          "options": {}
+        },
+        "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+        "typeVersion": 1,
+        "position": [
+          832,
+          128
+        ],
+        "id": "deca06ff-fe6e-461c-b2ee-831df8cb4d96",
+        "name": "DeepSeek - Modèle LangChain",
+        "credentials": {
+          "deepSeekApi": {
+            "id": "MBt6ozX97KVIAwcD",
+            "name": "DeepSeek account"
+          }
+        }
+      }
+  ],
+  "connections": {
+      "Trigger - Récap journalier": {
+        "main": [
+          [
+            {
+              "node": "Sheets - Récupère notes à envoyer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "DeepSeek - Génère récap journalier": {
+        "main": [
+          [
+            {
+              "node": "Telegram - Envoie récap",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code JS - Compile notes": {
+        "main": [
+          [
+            {
+              "node": "DeepSeek - Génère récap journalier",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Telegram - Envoie récap": {
+        "main": [
+          [
+            {
+              "node": "Code JS - Récupère lignes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code JS - Récupère lignes": {
+        "main": [
+          [
+            {
+              "node": "Sheets - Marque notes envoyées",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Si - Notes à envoyer ?": {
+        "main": [
+          [
+            {
+              "node": "Code JS - Compile notes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sheets - Récupère notes à envoyer": {
+        "main": [
+          [
+            {
+              "node": "Si - Notes à envoyer ?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sheets - Marque notes envoyées": {
+        "main": [
+          []
+        ]
+      },
+      "DeepSeek - Modèle LangChain": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "DeepSeek - Génère récap journalier",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      }
+  },
+  "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "timeSavedMode": "fixed",
+      "errorWorkflow": "wg0YurkUmY4jQap6",
+      "callerPolicy": "workflowsFromSameOwner",
+      "availableInMCP": false
+  }
+}

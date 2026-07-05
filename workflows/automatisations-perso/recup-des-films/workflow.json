@@ -1,0 +1,339 @@
+{
+  "name": "RECUP DES FILMS",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "includeSpamTrash": true,
+          "q": "from:ugc",
+          "receivedAfter": "={{ DateTime.now().setZone('Europe/Paris').minus({ days: 1 }).startOf('day').toISO() }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [224, 0],
+      "id": "19690b24-f42e-44d1-b358-acf31d9602e4",
+      "name": "Gmail - Emails UGC",
+      "webhookId": "dc19de71-5d3f-44db-9b38-278faf9d62e4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "FP3J5H6SOdZtaoAL",
+          "name": "COMPTE GMAIL PERSO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "your-email@domain.com",
+          "mode": "list",
+          "cachedResultName": "your-email@domain.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ DateTime.now().setZone('Europe/Paris').minus({ days: 1 }).startOf('day').toISO() }}",
+        "timeMax": "=",
+        "options": { "orderBy": "startTime" }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [224, -192],
+      "id": "b0f0e048-7baa-4d18-861f-040c631456d7",
+      "name": "Calendar - Événements perso",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "VecAIbLiRiuvyEBZ",
+          "name": "Google Calendar perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_CALENDAR_ID@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "iPhone"
+        },
+        "returnAll": true,
+        "timeMin": "={{ DateTime.now().setZone('Europe/Paris').minus({ days: 1 }).startOf('day').toISO() }}",
+        "timeMax": "=",
+        "options": { "orderBy": "startTime" }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [224, 192],
+      "id": "bd744893-8f5c-4efd-a5db-4082a785ae4d",
+      "name": "Calendar - Événements iPhone",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "VecAIbLiRiuvyEBZ",
+          "name": "Google Calendar perso account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{}] }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0],
+      "id": "2b0ea721-7d39-4c7c-a2cc-5ff56eaccaa7",
+      "name": "Trigger - Récup films UGC"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 3, "leftValue": "", "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "d877f801-7796-4a67-8c52-818dc9feb538",
+              "leftValue": "={{ $json.From }}",
+              "rightValue": "ugc",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [672, 0],
+      "id": "f9173893-f447-47d0-8fd0-cc1b191bf14d",
+      "name": "Si - Email UGC ?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LISTE DES FILMS VUE",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "DATE": "={{ DateTime.fromMillis(Number($('Gmail - Emails UGC').item.json.internalDate)).setZone('Europe/Paris').toFormat('dd-MM-yyyy') }}",
+            "NOM DU FILM": "={{ $('Gmail - Emails UGC').item.json.Subject }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "DATE", "displayName": "DATE", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "NOM DU FILM", "displayName": "NOM DU FILM", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [912, -32],
+      "id": "115c8a0c-68d3-4194-9c8c-96b649995984",
+      "name": "Sheets - Enregistre film email",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 3, "leftValue": "", "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "d877f801-7796-4a67-8c52-818dc9feb538",
+              "leftValue": "={{ $json.location }}",
+              "rightValue": "UGC",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "id": "e37f39eb-057c-47dd-943b-8c708ddb57fa",
+              "leftValue": "={{ $json.location }}",
+              "rightValue": "ugc",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [448, -192],
+      "id": "c1c6518e-0f50-4ae3-bc6d-474ab59d8681",
+      "name": "Si - Événement UGC perso ?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LISTE DES FILMS VUE",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "DATE": "={{ DateTime.fromISO( $json.start.dateTime ).toFormat('dd-MM-yyyy') }}",
+            "NOM DU FILM": "={{ $('Calendar - Événements perso').item.json.summary }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "DATE", "displayName": "DATE", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "NOM DU FILM", "displayName": "NOM DU FILM", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [704, -224],
+      "id": "12dbec31-f7f7-4601-81f6-18e62426db8b",
+      "name": "Sheets - Enregistre film perso",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 3, "leftValue": "", "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "d877f801-7796-4a67-8c52-818dc9feb538",
+              "leftValue": "={{ $json.location }}",
+              "rightValue": "UGC",
+              "operator": { "type": "string", "operation": "contains" }
+            },
+            {
+              "id": "9402fb54-2598-4c03-97c2-5834774da4be",
+              "leftValue": "={{ $json.location }}",
+              "rightValue": "ugc",
+              "operator": { "type": "string", "operation": "contains" }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [448, 192],
+      "id": "d1c47ae8-c012-4fd1-b6a4-5ad0c3c0ec1f",
+      "name": "Si - Événement UGC iPhone ?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LISTE DES FILMS VUE",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "DATE": "={{ DateTime.fromISO( $json.start).toFormat('dd-MM-yyyy') }}",
+            "NOM DU FILM": "={{ $('Calendar - Événements iPhone').item.json.summary }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "DATE", "displayName": "DATE", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "NOM DU FILM", "displayName": "NOM DU FILM", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [672, 192],
+      "id": "ebc99c9b-457a-479c-a453-b87814295aec",
+      "name": "Sheets - Enregistre film iPhone",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": { "sortField": [{ "fieldName": "internalDate" }] },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [448, 0],
+      "id": "62cb1d03-656c-4b9d-9cbc-55674cb2bfb5",
+      "name": "Trie - Par date"
+    }
+  ],
+  "connections": {
+    "Gmail - Emails UGC": { "main": [[{ "node": "Trie - Par date", "type": "main", "index": 0 }]] },
+    "Calendar - Événements perso": { "main": [[{ "node": "Si - Événement UGC perso ?", "type": "main", "index": 0 }]] },
+    "Trigger - Récup films UGC": {
+      "main": [[
+        { "node": "Gmail - Emails UGC", "type": "main", "index": 0 },
+        { "node": "Calendar - Événements perso", "type": "main", "index": 0 },
+        { "node": "Calendar - Événements iPhone", "type": "main", "index": 0 }
+      ]]
+    },
+    "Calendar - Événements iPhone": { "main": [[{ "node": "Si - Événement UGC iPhone ?", "type": "main", "index": 0 }]] },
+    "Si - Email UGC ?": { "main": [[{ "node": "Sheets - Enregistre film email", "type": "main", "index": 0 }]] },
+    "Si - Événement UGC perso ?": { "main": [[{ "node": "Sheets - Enregistre film perso", "type": "main", "index": 0 }]] },
+    "Si - Événement UGC iPhone ?": { "main": [[{ "node": "Sheets - Enregistre film iPhone", "type": "main", "index": 0 }]] },
+    "Trie - Par date": { "main": [[{ "node": "Si - Email UGC ?", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

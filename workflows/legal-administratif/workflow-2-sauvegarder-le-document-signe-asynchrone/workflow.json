@@ -1,0 +1,71 @@
+{
+  "name": "Workflow 2 : Sauvegarder le document signé Asynchrone",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/docuseal-callback",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "02089a5b-b6b3-4bf8-a18a-f6d157ed9326",
+      "name": "Webhook - Synchronie signature",
+      "webhookId": "5e7930aa-ce2b-4ff1-a23f-b00319abfacc"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $node[\"Webhook - Synchronie signature\"].json.body.data.submitters[0].external_id }}",
+          "mode": "id"
+        },
+        "simple": false,
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "DEVIS SIGNE|files",
+              "fileUrls": {
+                "fileUrl": [
+                  {
+                    "name": "devis signé",
+                    "url": "={{ $json.body.data.documents[0].url }}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [256, 0],
+      "id": "967a2d04-fdbd-410c-b6bd-18a8616015fc",
+      "name": "Notion - Sauvegarde devis signé",
+      "credentials": {
+        "notionApi": {
+          "id": "tBArA7034KB3iCxQ",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Synchronie signature": {
+      "main": [[{ "node": "Notion - Sauvegarde devis signé", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

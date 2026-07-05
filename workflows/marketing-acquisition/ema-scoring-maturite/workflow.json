@@ -1,0 +1,399 @@
+{
+  "name": "EMA - SCORING MATURITÉ",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ema-scoring",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "01b65113-d128-4ba5-ad50-c304c9cbd82c",
+      "name": "Webhook - Scoring",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        304
+      ],
+      "webhookId": "fa543632-da07-4809-bce0-9180613d171e",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rowId = $json.body.row_id || $json.row_id;\nreturn [{json: {row_id: rowId}}];"
+      },
+      "id": "490fcbbc-d514-4606-8d18-200363544f6b",
+      "name": "Code - Préparer Lecture",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REMPLACER_PAR_ID_GOOGLE_SHEET_PROSPECTS_EMAFUITES"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Prospects"
+        },
+        "options": {}
+      },
+      "id": "02dcd810-7bcf-4035-b456-7804c5e0d02e",
+      "name": "GSheets - Lire Prospect",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        656,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rowId = $('Code - Préparer Lecture').item.json.row_id;\nconst items = $input.all();\nconst found = items.find(i => i.json.ID == rowId);\nif (!found) return [{json: {ID: rowId, error: 'prospect non trouvé'}}];\nreturn [{json: found.json}];"
+      },
+      "id": "75e0e99d-60e9-48b8-86dc-a90664f96ef6",
+      "name": "Code - Extraire par ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst emailDispo = item.Email && item.Email.trim() !== '' ? 'oui' : 'non';\nconst siteExiste = item.Site_web && item.Site_web.trim() !== '' ? item.Site_web : 'non';\nconst prompt = `Score ce prospect B2B pour une société de détection de fuites d'eau (interventions 400-800€, zone Nord/Pas-de-Calais). Réponds UNIQUEMENT en JSON valide sans backticks.\n\nDonnées :\n- Poste : ${item.Poste || ''}\n- Entreprise : ${item.Entreprise || ''}\n- Persona : ${item.Persona || ''}\n- Site web : ${siteExiste}\n- Email disponible : ${emailDispo}\n- Source : ${item.Source || ''}\n- Ville : ${item.Ville || ''}\n\nCritères de scoring (total sur 100) :\n+30 si poste = décideur direct syndic ou bailleur social\n+20 si source = formulaire site web (intention forte)\n+15 si email professionnel disponible\n+15 si source = LinkedIn (intention moyenne)\n+10 si site web de l'entreprise existe\n+10 si grande structure probable (bailleur social, grand syndic)\n-10 si informations incomplètes (poste ou entreprise vague)\n\nRéponds : {\"score\": 75, \"priorité\": \"HAUTE|MOYENNE|BASSE\", \"justification\": \"1 phrase\"}`;\nreturn [{json: {...item, claudeBody: {model: \"claude-sonnet-4-6\", max_tokens: 1000, messages: [{role: \"user\", content: prompt}]}}}];"
+      },
+      "id": "aefe82e2-ae40-4476-9da5-3f1c9b161fc5",
+      "name": "Code - Préparer Scoring",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.claudeBody) }}",
+        "options": {}
+      },
+      "id": "85b1b74b-607a-40d1-a236-9bc402af92ab",
+      "name": "Claude - Scorer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1264,
+        304
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "8Wcb8jgMTJM6CQjM",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst orig = $('Code - Préparer Scoring').item.json;\nlet parsed;\ntry { parsed = JSON.parse(resp.content[0].text); }\ncatch(e) { parsed = {score: 0, 'priorité': 'BASSE', justification: 'Erreur parsing'}; }\nreturn [{json: {...orig, score_result: parsed.score || parsed.score, priorite_result: parsed['priorité'] || parsed.priorite, justif_result: parsed.justification}}];"
+      },
+      "id": "5a0f8ec8-98ae-437d-bfa0-9e125969fe96",
+      "name": "Code - Parser Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REMPLACER_PAR_ID_GOOGLE_SHEET_PROSPECTS_EMAFUITES"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.ID }}",
+            "Score": "={{ $json.score_result }}",
+            "Priorité": "={{ $json.priorite_result }}",
+            "Statut": "SCORÉ",
+            "Notes": "={{ $json.justif_result }}"
+          },
+          "matchingColumns": [
+            "ID"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "6ecc7241-7aff-425a-819d-8d2d4cb126de",
+      "name": "GSheets - Mettre à jour Score",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1664,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "f521ec00-c185-4f38-b537-0f5ef40e31cb",
+              "leftValue": "={{ $json.score_result }}",
+              "rightValue": 60,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c397ec62-17b4-4362-a777-a5f3d8d287f8",
+      "name": "IF - Score >= 60",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1856,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-domain.com/webhook/ema-audit",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({row_id: $json.ID}) }}",
+        "options": {}
+      },
+      "id": "33a35443-5235-4da7-8fa0-f4a6126332ef",
+      "name": "HTTP - Déclencher W3 Audit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2064,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REMPLACER_PAR_ID_GOOGLE_SHEET_PROSPECTS_EMAFUITES"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.ID }}",
+            "Statut": "NURTURING",
+            "Notes": "={{ 'Score ' + $json.score_result + '/100 — ' + $json.justif_result }}"
+          },
+          "matchingColumns": [
+            "ID"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "2940eff7-70e2-42b5-b2e2-cd978a49d8d9",
+      "name": "GSheets - Nurturing",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2064,
+        464
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Scoring": {
+      "main": [
+        [
+          {
+            "node": "Code - Préparer Lecture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Préparer Lecture": {
+      "main": [
+        [
+          {
+            "node": "GSheets - Lire Prospect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GSheets - Lire Prospect": {
+      "main": [
+        [
+          {
+            "node": "Code - Extraire par ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Extraire par ID": {
+      "main": [
+        [
+          {
+            "node": "Code - Préparer Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Préparer Scoring": {
+      "main": [
+        [
+          {
+            "node": "Claude - Scorer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Scorer": {
+      "main": [
+        [
+          {
+            "node": "Code - Parser Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Parser Score": {
+      "main": [
+        [
+          {
+            "node": "GSheets - Mettre à jour Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GSheets - Mettre à jour Score": {
+      "main": [
+        [
+          {
+            "node": "IF - Score >= 60",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Score >= 60": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Déclencher W3 Audit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GSheets - Nurturing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "name": "SYNCHRO HUBSPOT VERS EVOLYZ",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "273ae685-f08a-4042-af38-bbe87d5d2e4a",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -192,
+        0
+      ],
+      "id": "342945ac-6d17-4ab5-b9bb-9bdf247fd154",
+      "name": "Webhook - Deal HubSpot modifié",
+      "webhookId": "273ae685-f08a-4042-af38-bbe87d5d2e4a"
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "deal",
+        "operation": "get",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.body[0].objectId }}",
+          "mode": "id"
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        16,
+        0
+      ],
+      "id": "72f59cfc-aff0-47b7-bea2-bf66ff5a424c",
+      "name": "HubSpot - Récupère deal",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "sJw04k1AlRjVc0eq",
+          "name": "HubSpot account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Deal HubSpot modifié": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Récupère deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

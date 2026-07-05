@@ -1,0 +1,1020 @@
+{
+  "name": "EMA Fuites - Chatbot - WhatsApp",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-ema",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-2464, -336],
+      "id": "e52a1c15-73f5-4af8-96c2-04ddaa18147c",
+      "name": "Webhook - Reçoit messages WhatsApp",
+      "webhookId": "3393c182-06b7-4ede-9210-ce3a27d74fea"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\nif (!body || body.object !== 'whatsapp_business_account') {\n  return [{ json: { valid: false, reason: 'not_whatsapp' } }];\n}\n\nconst entry = body.entry && body.entry[0];\nif (!entry) return [{ json: { valid: false, reason: 'no_entry' } }];\n\nconst change = entry.changes && entry.changes[0];\nif (!change || change.field !== 'messages') return [{ json: { valid: false, reason: 'no_messages_field' } }];\n\nconst value = change.value;\nif (value.statuses) return [{ json: { valid: false, reason: 'status_update' } }];\n\nconst messages = value.messages;\nif (!messages || !messages[0]) return [{ json: { valid: false, reason: 'no_message' } }];\n\nconst message = messages[0];\nconst contact  = value.contacts && value.contacts[0];\n\nif (message.type !== 'text') {\n  return [{ json: {\n    valid: true,\n    non_text: true,\n    from: message.from,\n    display_name: contact ? contact.profile.name : 'Client',\n    phone_number_id: value.metadata.phone_number_id\n  }}];\n}\n\nreturn [{ json: {\n  valid: true,\n  non_text: false,\n  from: message.from,\n  message_id: message.id,\n  message_text: message.text.body,\n  display_name: contact ? contact.profile.name : 'Client',\n  timestamp: message.timestamp,\n  phone_number_id: value.metadata.phone_number_id\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2240, -336],
+      "id": "4d5696bc-459c-4613-ba77-6b2ffac28d65",
+      "name": "Code JS - Parse message entrant"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [896, -336],
+      "id": "6fcf547a-dccb-476c-9ab6-c41661684973",
+      "name": "Si - Message valide ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Charge l'état de conversation\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.conversations) staticData.conversations = {};\n\nconst from        = $json.from;\nconst displayName = $json.display_name || 'Client';\nconst nonText     = $json.non_text || false;\nconst messageText = $json.message_text || '';\nconst msgLower    = messageText.toLowerCase();\n\nconst conv = staticData.conversations[from] || {\n  step: 'initial',\n  history: [],\n  nom: displayName,\n  telephone: from\n};\n\n// Commande de réinitialisation manuelle (permet de sortir du mode handover bloqué)\nconst RESET_KEYWORDS = ['reset', '#reset', 'recommencer'];\nif (!nonText && RESET_KEYWORDS.includes(msgLower.trim())) {\n  staticData.conversations[from] = {\n    step: 'initial',\n    history: [{ role: 'user', content: 'Bonjour' }],\n    nom: displayName,\n    telephone: from\n  };\n  return [{ json: {\n    from,\n    phone_number_id: $json.phone_number_id,\n    messageText: 'Bonjour',\n    displayName,\n    mode: 'ia',\n    conv: staticData.conversations[from],\n    demandeHandover: false,\n    skip_ia: false\n  }}];\n}\n\n// Détecte demande handover humain\nconst HANDOVER_KEYWORDS = [\n  'humain', 'personne', 'conseiller', 'rappel', 'rappelle',\n  'parler', 'quelquun', 'quelqu\\'un', 'agent', 'technicien',\n  'urgent', 'urgence', 'aide', 'help', 'sos'\n];\nconst demandeHandover = HANDOVER_KEYWORDS.some(k => msgLower.includes(k)) && conv.step !== 'handover';\n\n// Si déjà en handover humain, ignorer (le technicien répond directement)\nif (conv.step === 'handover') {\n  staticData.conversations[from] = conv;\n  return [{ json: {\n    from,\n    phone_number_id: $json.phone_number_id,\n    mode: 'handover_actif',\n    conv,\n    skip_ia: true\n  }}];\n}\n\nif (nonText) {\n  return [{ json: {\n    from,\n    phone_number_id: $json.phone_number_id,\n    response: \"Je traite uniquement les messages texte. Décrivez votre problème en quelques mots 😊\",\n    skip_ia: true,\n    conv\n  }}];\n}\n// Prépare l'historique pour DeepSeek\nconst history = conv.history || [];\nhistory.push({ role: 'user', content: messageText });\n\n// Sauvegarde état intermédiaire\nstaticData.conversations[from] = {\n  ...conv,\n  history,\n  nom: displayName\n};\n\nreturn [{ json: {\n  from,\n  phone_number_id: $json.phone_number_id,\n  messageText,\n  displayName,\n  mode: 'ia',\n  conv: staticData.conversations[from],\n  demandeHandover,\n  skip_ia: false\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, -336],
+      "id": "29842032-8f24-4b56-bcb0-8d79040e56fc",
+      "name": "Code JS - Charge état conversation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-skip",
+              "leftValue": "={{ $json.skip_ia }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1344, -336],
+      "id": "d2ef517f-d745-46b5-b091-720d7343ebbe",
+      "name": "Si - Skip IA ? (handover actif)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst conv = d.conv;\nconst VILLES_COUVERTES = [\n  'lille', 'roubaix', 'tourcoing', 'villeneuve', 'marcq', 'wasquehal',\n  'croix', 'hem', 'wattrelos', 'mouvaux', 'loos', 'seclin', 'lesquin',\n  'wambrechies', 'lambersart', 'lens', 'lievin', 'henin', 'bethune',\n  'bruay', 'noeux', 'dunkerque', 'arras', 'douai', 'valenciennes',\n  'maubeuge', 'calais', 'boulogne', 'saint-omer', 'hazebrouck',\n  'armentieres', 'saint omer'\n];\n\n// Construction du system prompt dynamique\nconst systemPrompt = `Tu es l'assistant virtuel d'EMA Fuites, spécialiste en détection de fuites non destructive dans les Hauts-de-France.\n\nTon objectif : qualifier les leads en collectant 3 informations :\n1. TYPE DE FUITE (fuite visible, fuite suspectée/humidité, compteur anormal, autre)\n2. VILLE (doit être dans les Hauts-de-France)\n3. URGENCE (urgent/cette semaine/pas urgent)\n\nVILLES COUVERTES : ${VILLES_COUVERTES.join(', ')} et environs.\n\nÉTAT ACTUEL DE LA CONVERSATION :\n- type_fuite : ${conv.type_fuite || 'non renseigné'}\n- ville : ${conv.ville || 'non renseigné'}\n- urgence : ${conv.urgence || 'non renseigné'}\n\nRÈGLES :\n- Réponds en français, de façon chaleureuse et professionnelle\n- Pose UNE SEULE question à la fois\n- Si la ville n'est pas dans la zone couverte, explique poliment et termine\n- Si toutes les infos sont collectées, confirme et dis qu'un technicien va rappeler\n- Si la question est trop technique ou hors sujet, propose un rappel humain\n- Maximum 3 phrases par réponse\n- Ne mentionne jamais de prix\n\nRéponds UNIQUEMENT en JSON valide :\n{\n  \"message\": \"ta réponse au client\",\n  \"type_fuite\": \"valeur extraite ou null\",\n  \"ville\": \"valeur extraite ou null\",\n  \"urgence\": \"valeur extraite ou null\",\n  \"qualified\": true/false,\n  \"hors_zone\": true/false,\n  \"besoin_humain\": true/false\n}`;\n\nconst messages = [\n  { role: 'system', content: systemPrompt },\n  ...(conv.history || []).slice(-6) // max 6 derniers échanges\n];\n\nreturn [{ json: {\n  ...d,\n  requestBody: JSON.stringify({\n    model: 'deepseek-chat',\n    temperature: 0.3,\n    max_tokens: 400,\n    messages\n  })\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1568, -336],
+      "id": "e5a5121b-9429-4bea-8221-01a2c4b44813",
+      "name": "Code JS - Prépare prompt DeepSeek"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1792, -336],
+      "id": "5a8fe0cd-8617-4ee0-b43f-f105189f73e6",
+      "name": "API DeepSeek - Analyse et répond",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "MBt6ozX97KVIAwcD",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content\n  .trim()\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/i, '')\n  .replace(/```\\s*$/i, '');\n\nconst prev = $('Code JS - Prépare prompt DeepSeek').first().json;\nconst conv = prev.conv;\n\nlet ia;\ntry {\n  ia = JSON.parse(raw);\n} catch(e) {\n  ia = {\n    message: \"Je n'ai pas bien compris. Pouvez-vous reformuler ? 😊\",\n    type_fuite: null, ville: null, urgence: null,\n    qualified: false, hors_zone: false, besoin_humain: false\n  };\n}\n\n// Met à jour les données collectées\nconst updatedConv = {\n  ...conv,\n  type_fuite: ia.type_fuite || conv.type_fuite || null,\n  ville:      ia.ville      || conv.ville      || null,\n  urgence:    ia.urgence    || conv.urgence    || null\n};\n\n// Ajoute la réponse IA à l'historique\nif (!updatedConv.history) updatedConv.history = [];\nupdatedConv.history.push({ role: 'assistant', content: ia.message });\n\n// Détermine le prochain step\nlet newStep = conv.step || 'initial';\nif (ia.hors_zone || prev.demandeHandover)  newStep = 'handover';\nelse if (ia.qualified)                     newStep = 'done';\nelse                                        newStep = 'en_cours';\n\nupdatedConv.step = newStep;\n\n// Sauvegarde\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.conversations) staticData.conversations = {};\nstaticData.conversations[prev.from] = updatedConv;\n\nreturn [{ json: {\n  from:           prev.from,\n  phone_number_id: prev.phone_number_id,\n  response:       ia.message,\n  qualified:      ia.qualified || false,\n  hors_zone:      ia.hors_zone || false,\n  besoin_humain:  ia.besoin_humain || prev.demandeHandover || false,\n  step:           newStep,\n  leadData:       updatedConv\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2016, -336],
+      "id": "db49beef-744b-4760-b16c-d24a3a4e42ee",
+      "name": "Code JS - Parse réponse DeepSeek"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-humain",
+              "leftValue": "={{ $json.besoin_humain }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2240, -336],
+      "id": "922429e1-d98f-4536-bf10-f7fd8118f4b8",
+      "name": "Si - Handover humain ?"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🙋 <b>Handover WhatsApp — EMA Fuites</b>\n\n👤 <b>{{ $json.leadData.nom }}</b>\n📞 {{ $json.from }}\n\n💬 Le client demande à parler à un humain ou a une question complexe.\n\n📋 Ce qui a été collecté :\n• Problème : {{ $json.leadData.type_fuite || 'non renseigné' }}\n• Ville : {{ $json.leadData.ville || 'non renseigné' }}\n• Urgence : {{ $json.leadData.urgence || 'non renseigné' }}\n\n👉 <b>Réponds directement sur WhatsApp au {{ $json.from }}</b>\nLe bot est mis en pause pour cette conversation.\n\n💬 Conversation Chatwoot : {{ $json.chatwoot_conversation_url || 'non disponible' }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2688, -480],
+      "id": "ef109d52-8203-438f-9d0b-790daa89215f",
+      "name": "Telegram - Alerte handover",
+      "webhookId": "8437aaac-8827-4fac-8bec-9c221b104ced",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v21.0/{{ $json.phone_number_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.from }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": {{ JSON.stringify($json.response) }}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2464, -240],
+      "id": "3f5ae226-9642-40ea-844d-ed6a5c629b9c",
+      "name": "API Meta - Envoie réponse WhatsApp",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-qualified",
+              "leftValue": "={{ $json.qualified }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [3584, -240],
+      "id": "932ff54b-172c-477c-8e10-0b92bfd83a87",
+      "name": "Si - Lead qualifié ?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_SPREADSHEET_ID_EMA_FUITES",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "leads_whatsapp",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.date || $now.toFormat('dd/MM/yyyy') }}",
+            "Heure": "={{ $now.toFormat('HH:mm') }}",
+            "Nom": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.nom }}",
+            "Telephone": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.telephone }}",
+            "Type_fuite": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.type_fuite }}",
+            "Ville": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.ville }}",
+            "Urgence": "={{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.urgence }}",
+            "Source": "WhatsApp",
+            "Statut": "Nouveau"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Date", "displayName": "Date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Heure", "displayName": "Heure", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Nom", "displayName": "Nom", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Telephone", "displayName": "Telephone", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Type_fuite", "displayName": "Type_fuite", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Ville", "displayName": "Ville", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Urgence", "displayName": "Urgence", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Source", "displayName": "Source", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Statut", "displayName": "Statut", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [3808, -240],
+      "id": "d463e08e-803a-4e24-9a18-ab5e4617ad0d",
+      "name": "Google Sheets - Sauvegarde lead",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔔 <b>Nouveau lead WhatsApp — EMA Fuites</b>\n\n👤 <b>{{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.nom }}</b>\n📞 {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.telephone }}\n\n📋 Problème : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.type_fuite }}\n📍 Ville : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.ville }}\n⏱️ Urgence : {{ $('Code JS - Parse réponse DeepSeek').item.json.leadData.urgence }}\n\n🕐 {{ $now.toFormat('dd/MM/yyyy') }} à {{ $now.toFormat('HH:mm') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [4032, -240],
+      "id": "80eefae4-1f6b-4616-9341-7cd9d4e2d0c8",
+      "name": "Telegram - Notif nouveau lead",
+      "webhookId": "756bd062-0976-4aa4-909d-caf3b44e8358",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "whatsapp-ema",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f1e2d3c4-b5a6-4890-abcd-ef1234567801",
+      "name": "Webhook - Vérification Meta GET",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-2464, 152],
+      "webhookId": "4b8387b1-4c6b-4324-a6cc-fa799dc0121a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const query = $input.first().json.query || {};\n\nconst VERIFY_TOKEN = 'YOUR_WEBHOOK_VERIFY_TOKEN';\n\nconst mode      = query['hub.mode']         || query['hub_mode'];\nconst token     = query['hub.verify_token'] || query['hub_verify_token'];\nconst challenge = query['hub.challenge']    || query['hub_challenge'];\n\nif (mode === 'subscribe' && token === VERIFY_TOKEN) {\n  return [{ json: { challenge: challenge, valid: true } }];\n}\n\nreturn [{ json: { challenge: '', valid: false } }];"
+      },
+      "id": "f1e2d3c4-b5a6-4890-abcd-ef1234567802",
+      "name": "Code JS - Vérifie token GET",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2240, 152]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-token-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f1e2d3c4-b5a6-4890-abcd-ef1234567803",
+      "name": "Si - Token valide ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-2016, 152]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "f1e2d3c4-b5a6-4890-abcd-ef1234567804",
+      "name": "Webhook - Répond challenge 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-1792, 56]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "f1e2d3c4-b5a6-4890-abcd-ef1234567805",
+      "name": "Webhook - Répond 403 Token invalide",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-1792, 248]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst staticData = $getWorkflowStaticData('global');\nconst cw = staticData.chatwoot && staticData.chatwoot[item.from];\nconst conversationId = cw && cw.conversation_id;\n\nreturn [{ json: {\n  ...item,\n  chatwoot_conversation_url: conversationId\n    ? `https://chat.emafuites.fr/app/accounts/1/conversations/${conversationId}`\n    : null\n}}];"
+      },
+      "id": "c1a2b3c4-0003-4a1b-9c1d-000000000003",
+      "name": "Code JS - Chatwoot - Lien conversation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2464, -480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nif (!item.valid) {\n  return [{ json: { ...item, chatwoot_process: false } }];\n}\n\nconst rawFrom = item.from;\nconst phone = rawFrom && rawFrom.startsWith('+') ? rawFrom : `+${rawFrom}`;\nconst displayName = item.display_name || 'Client WhatsApp';\nconst messageText = item.non_text ? '[Message non textuel reçu]' : (item.message_text || '');\n\nreturn [{ json: {\n  ...item,\n  chatwoot_process: true,\n  chatwoot_phone: phone,\n  chatwoot_display_name: displayName,\n  chatwoot_message_text: messageText\n}}];"
+      },
+      "id": "cw2-n01",
+      "name": "Chatwoot - Prépare entrant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2016, -336]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-cw-process",
+              "leftValue": "={{ $json.chatwoot_process }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "cw2-n02",
+      "name": "Si - Chatwoot à traiter ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-1792, -336]
+    },
+    {
+      "parameters": {
+        "url": "=https://chat.emafuites.fr/api/v1/accounts/1/contacts/search?q={{ encodeURIComponent($json.chatwoot_phone) }}&include_contacts=true",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "cw2-n03",
+      "name": "Chatwoot - Recherche contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-1568, -408],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Fbe2WxPutRFqtKJc",
+          "name": "Chatwoot API - EMA Fuites"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-cw-contact-found",
+              "leftValue": "={{ Array.isArray($json.payload) && $json.payload.length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "cw2-n04",
+      "name": "Si - Contact Chatwoot trouvé ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-1344, -408]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.emafuites.fr/api/v1/accounts/1/contacts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ name: $('Chatwoot - Prépare entrant').item.json.chatwoot_display_name, phone_number: $('Chatwoot - Prépare entrant').item.json.chatwoot_phone }) }}",
+        "options": {}
+      },
+      "id": "cw2-n05",
+      "name": "Chatwoot - Créer contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-1120, -480],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Fbe2WxPutRFqtKJc",
+          "name": "Chatwoot API - EMA Fuites"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nlet contactId = null;\n\nif (Array.isArray(raw.payload)) {\n  contactId = raw.payload[0] && raw.payload[0].id ? raw.payload[0].id : null;\n} else {\n  contactId = (raw.payload && raw.payload.contact && raw.payload.contact.id)\n    || (raw.payload && raw.payload.id)\n    || raw.id\n    || null;\n}\n\nconst base = $('Chatwoot - Prépare entrant').item.json;\nreturn [{ json: { ...base, chatwoot_contact_id: contactId } }];"
+      },
+      "id": "cw2-n06",
+      "name": "Chatwoot - Merge contact id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-896, -408]
+    },
+    {
+      "parameters": {
+        "url": "=https://chat.emafuites.fr/api/v1/accounts/1/contacts/{{ $json.chatwoot_contact_id }}/conversations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "cw2-n07",
+      "name": "Chatwoot - Liste conversations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-672, -408],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Fbe2WxPutRFqtKJc",
+          "name": "Chatwoot API - EMA Fuites"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-cw-conv-found",
+              "leftValue": "={{ Array.isArray($json.payload) && $json.payload.some(c => c.inbox_id === 2 && c.status === 'open') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "cw2-n08",
+      "name": "Si - Conversation Chatwoot ouverte trouvée ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [-448, -408]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://chat.emafuites.fr/api/v1/accounts/1/conversations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ inbox_id: 2, contact_id: $('Chatwoot - Merge contact id').item.json.chatwoot_contact_id, status: 'open' }) }}",
+        "options": {}
+      },
+      "id": "cw2-n09",
+      "name": "Chatwoot - Créer conversation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-224, -336],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Fbe2WxPutRFqtKJc",
+          "name": "Chatwoot API - EMA Fuites"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nlet conversationId = null;\n\nif (Array.isArray(raw.payload)) {\n  const open = raw.payload.find(c => c.inbox_id === 2 && c.status === 'open');\n  conversationId = open ? open.id : null;\n} else {\n  conversationId = raw.id || (raw.payload && raw.payload.id) || null;\n}\n\nconst base = $('Chatwoot - Prépare entrant').item.json;\nconst contactId = $('Chatwoot - Merge contact id').item.json.chatwoot_contact_id;\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.chatwoot) staticData.chatwoot = {};\nstaticData.chatwoot[base.from] = { contact_id: contactId || null, conversation_id: conversationId || null };\n\nreturn [{ json: { ...base, chatwoot_contact_id: contactId, chatwoot_conversation_id: conversationId } }];"
+      },
+      "id": "cw2-n10",
+      "name": "Chatwoot - Merge conversation id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, -408]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-cw-conv-dispo",
+              "leftValue": "={{ !!$json.chatwoot_conversation_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "cw2-n11",
+      "name": "Si - Conversation Chatwoot disponible ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [224, -408]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.emafuites.fr/api/v1/accounts/1/conversations/{{ $json.chatwoot_conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ content: '📩 Message client WhatsApp : ' + $('Chatwoot - Prépare entrant').item.json.chatwoot_message_text, message_type: 'outgoing', private: true }) }}",
+        "options": {}
+      },
+      "id": "cw2-n12",
+      "name": "Chatwoot - Log message entrant",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [448, -480],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Fbe2WxPutRFqtKJc",
+          "name": "Chatwoot API - EMA Fuites"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Code JS - Parse message entrant').item.json }];"
+      },
+      "id": "cw2-n13",
+      "name": "Chatwoot - Retour item original",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, -336]
+    },
+    {
+      "parameters": {
+        "jsCode": "const metaResponse = $input.first().json;\nconst prev = $('Code JS - Parse réponse DeepSeek').item.json;\n\nconst staticData = $getWorkflowStaticData('global');\nconst cw = staticData.chatwoot && staticData.chatwoot[prev.from];\n\nreturn [{ json: {\n  _metaResponse: metaResponse,\n  chatwoot_conversation_id: (cw && cw.conversation_id) || null,\n  chatwoot_bot_response: prev.response || ''\n}}];"
+      },
+      "id": "cw2-m01",
+      "name": "Chatwoot - Résout conversation sortant",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2688, -240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-cw-sortant-dispo",
+              "leftValue": "={{ !!$json.chatwoot_conversation_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "cw2-m02",
+      "name": "Si - Conversation Chatwoot dispo (sortant) ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2912, -240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.emafuites.fr/api/v1/accounts/1/conversations/{{ $json.chatwoot_conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ content: '🤖 Réponse bot : ' + $json.chatwoot_bot_response, message_type: 'outgoing', private: true, content_attributes: { from_bot: true } }) }}",
+        "options": {}
+      },
+      "id": "cw2-m03",
+      "name": "Chatwoot - Log réponse bot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3136, -168],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Fbe2WxPutRFqtKJc",
+          "name": "Chatwoot API - EMA Fuites"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Chatwoot - Résout conversation sortant').item.json._metaResponse }];"
+      },
+      "id": "cw2-m04",
+      "name": "Chatwoot - Restaure sortie Meta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3360, -240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Code JS - Parse réponse DeepSeek').item.json;\nconst staticData = $getWorkflowStaticData('global');\nconst cw = staticData.chatwoot && staticData.chatwoot[prev.from];\n\nreturn [{ json: { chatwoot_conversation_id: (cw && cw.conversation_id) || null } }];"
+      },
+      "id": "cw2-h01",
+      "name": "Chatwoot - Résout conversation handover",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2912, -480]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-cw-handover-dispo",
+              "leftValue": "={{ !!$json.chatwoot_conversation_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "cw2-h02",
+      "name": "Si - Conversation Chatwoot dispo (handover) ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [3136, -480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.emafuites.fr/api/v1/accounts/1/conversations/{{ $('Chatwoot - Résout conversation handover').item.json.chatwoot_conversation_id }}/assignments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ assignee_id: null }) }}",
+        "options": {}
+      },
+      "id": "cw2-h03",
+      "name": "Chatwoot - Assigne conversation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3360, -480],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Fbe2WxPutRFqtKJc",
+          "name": "Chatwoot API - EMA Fuites"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://chat.emafuites.fr/api/v1/accounts/1/conversations/{{ $('Chatwoot - Résout conversation handover').item.json.chatwoot_conversation_id }}/toggle_status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ status: 'open' }) }}",
+        "options": {}
+      },
+      "id": "cw2-h04",
+      "name": "Chatwoot - Ouvre conversation (statut)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3584, -480],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Fbe2WxPutRFqtKJc",
+          "name": "Chatwoot API - EMA Fuites"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Webhook - Reçoit messages WhatsApp": {
+      "main": [[{ "node": "Code JS - Parse message entrant", "type": "main", "index": 0 }]]
+    },
+    "Si - Message valide ?": {
+      "main": [[{ "node": "Code JS - Charge état conversation", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Charge état conversation": {
+      "main": [[{ "node": "Si - Skip IA ? (handover actif)", "type": "main", "index": 0 }]]
+    },
+    "Si - Skip IA ? (handover actif)": {
+      "main": [[], [{ "node": "Code JS - Prépare prompt DeepSeek", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Prépare prompt DeepSeek": {
+      "main": [[{ "node": "API DeepSeek - Analyse et répond", "type": "main", "index": 0 }]]
+    },
+    "API DeepSeek - Analyse et répond": {
+      "main": [[{ "node": "Code JS - Parse réponse DeepSeek", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Parse réponse DeepSeek": {
+      "main": [[{ "node": "Si - Handover humain ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Handover humain ?": {
+      "main": [
+        [{ "node": "Code JS - Chatwoot - Lien conversation", "type": "main", "index": 0 }],
+        [{ "node": "API Meta - Envoie réponse WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Si - Lead qualifié ?": {
+      "main": [[{ "node": "Google Sheets - Sauvegarde lead", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets - Sauvegarde lead": {
+      "main": [[{ "node": "Telegram - Notif nouveau lead", "type": "main", "index": 0 }]]
+    },
+    "Webhook - Vérification Meta GET": {
+      "main": [[{ "node": "Code JS - Vérifie token GET", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Vérifie token GET": {
+      "main": [[{ "node": "Si - Token valide ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Token valide ?": {
+      "main": [
+        [{ "node": "Webhook - Répond challenge 200", "type": "main", "index": 0 }],
+        [{ "node": "Webhook - Répond 403 Token invalide", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code JS - Chatwoot - Lien conversation": {
+      "main": [[{ "node": "Telegram - Alerte handover", "type": "main", "index": 0 }]]
+    },
+    "Code JS - Parse message entrant": {
+      "main": [[{ "node": "Chatwoot - Prépare entrant", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Prépare entrant": {
+      "main": [[{ "node": "Si - Chatwoot à traiter ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Chatwoot à traiter ?": {
+      "main": [
+        [{ "node": "Chatwoot - Recherche contact", "type": "main", "index": 0 }],
+        [{ "node": "Chatwoot - Retour item original", "type": "main", "index": 0 }]
+      ]
+    },
+    "Chatwoot - Recherche contact": {
+      "main": [[{ "node": "Si - Contact Chatwoot trouvé ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Contact Chatwoot trouvé ?": {
+      "main": [
+        [{ "node": "Chatwoot - Merge contact id", "type": "main", "index": 0 }],
+        [{ "node": "Chatwoot - Créer contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Chatwoot - Créer contact": {
+      "main": [[{ "node": "Chatwoot - Merge contact id", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Merge contact id": {
+      "main": [[{ "node": "Chatwoot - Liste conversations", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Liste conversations": {
+      "main": [[{ "node": "Si - Conversation Chatwoot ouverte trouvée ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Conversation Chatwoot ouverte trouvée ?": {
+      "main": [
+        [{ "node": "Chatwoot - Merge conversation id", "type": "main", "index": 0 }],
+        [{ "node": "Chatwoot - Créer conversation", "type": "main", "index": 0 }]
+      ]
+    },
+    "Chatwoot - Créer conversation": {
+      "main": [[{ "node": "Chatwoot - Merge conversation id", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Merge conversation id": {
+      "main": [[{ "node": "Si - Conversation Chatwoot disponible ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Conversation Chatwoot disponible ?": {
+      "main": [
+        [{ "node": "Chatwoot - Log message entrant", "type": "main", "index": 0 }],
+        [{ "node": "Chatwoot - Retour item original", "type": "main", "index": 0 }]
+      ]
+    },
+    "Chatwoot - Log message entrant": {
+      "main": [[{ "node": "Chatwoot - Retour item original", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Retour item original": {
+      "main": [[{ "node": "Si - Message valide ?", "type": "main", "index": 0 }]]
+    },
+    "API Meta - Envoie réponse WhatsApp": {
+      "main": [[{ "node": "Chatwoot - Résout conversation sortant", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Résout conversation sortant": {
+      "main": [[{ "node": "Si - Conversation Chatwoot dispo (sortant) ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Conversation Chatwoot dispo (sortant) ?": {
+      "main": [
+        [{ "node": "Chatwoot - Log réponse bot", "type": "main", "index": 0 }],
+        [{ "node": "Chatwoot - Restaure sortie Meta", "type": "main", "index": 0 }]
+      ]
+    },
+    "Chatwoot - Log réponse bot": {
+      "main": [[{ "node": "Chatwoot - Restaure sortie Meta", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Restaure sortie Meta": {
+      "main": [[{ "node": "Si - Lead qualifié ?", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Alerte handover": {
+      "main": [[{ "node": "Chatwoot - Résout conversation handover", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Résout conversation handover": {
+      "main": [[{ "node": "Si - Conversation Chatwoot dispo (handover) ?", "type": "main", "index": 0 }]]
+    },
+    "Si - Conversation Chatwoot dispo (handover) ?": {
+      "main": [[{ "node": "Chatwoot - Assigne conversation", "type": "main", "index": 0 }]]
+    },
+    "Chatwoot - Assigne conversation": {
+      "main": [[{ "node": "Chatwoot - Ouvre conversation (statut)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

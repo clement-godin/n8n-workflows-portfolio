@@ -1,0 +1,304 @@
+{
+  "name": "RESUMER HEBDO DES VIDEOS YOUTUBE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "weeks", "triggerAtDay": [1], "triggerAtHour": 5 }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 416],
+      "id": "69c4f234-d7aa-428e-a069-7b967511b33e",
+      "name": "Trigger - Résumé hebdo YouTube"
+    },
+    {
+      "parameters": {
+        "resource": "playlistItem",
+        "operation": "getAll",
+        "playlistId": "YOUR_YOUTUBE_PLAYLIST_ID_IA_SEO",
+        "part": ["*", "contentDetails"],
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [224, 224],
+      "id": "c0882ddd-a370-4604-8a2f-81c3104186f2",
+      "name": "YouTube - Playlist IA/SEO",
+      "credentials": {
+        "youTubeOAuth2Api": { "id": "MPOg4tPrsh9NDZns", "name": "YouTube account" }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "playlistItem",
+        "operation": "getAll",
+        "playlistId": "YOUR_YOUTUBE_PLAYLIST_ID_VEILLE",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [224, 416],
+      "id": "13480fd9-3554-4f84-a1e2-dc218a9ee624",
+      "name": "YouTube - Playlist veille",
+      "credentials": {
+        "youTubeOAuth2Api": { "id": "MPOg4tPrsh9NDZns", "name": "YouTube account" }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [448, 320],
+      "id": "55a3a837-6618-493a-ae81-6bf9bbc9d92e",
+      "name": "Merge - Playlists YouTube"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID_VIDEOS_YOUTUBE",
+          "mode": "list",
+          "cachedResultName": "LISTE DES VIDEOS YOUTUBE ANALYSER",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID_VIDEOS_YOUTUBE/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID_VIDEOS_YOUTUBE/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [448, 584],
+      "id": "d741943f-2c61-451c-82d8-3d4f1c2377da",
+      "name": "Google Sheets - Videos analysées",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": { "options": {} },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1120, 416],
+      "id": "3f0fae62-ba3c-4093-8e24-e8f719dcdc2c",
+      "name": "Boucle - Vidéos à analyser"
+    },
+    {
+      "parameters": { "amount": 2 },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1344, 344],
+      "id": "6ae6476c-51b8-4919-bdb2-e51e74d23519",
+      "name": "Attente - Anti-rate limit",
+      "webhookId": "0bf1ae38-028b-4795-a994-82e37d410303"
+    },
+    {
+      "parameters": {
+        "operation": "getTranscript",
+        "videoUrl": "={{ $json.url }}",
+        "text": true,
+        "lang": "fr"
+      },
+      "type": "n8n-nodes-supadata.supadata",
+      "typeVersion": 1,
+      "position": [1568, 344],
+      "id": "84e101de-3481-491a-adf0-58c3499bd201",
+      "name": "Supadata - Transcript vidéo",
+      "credentials": {
+        "supadataApi": { "id": "0er34QZ2HeWBKLjL", "name": "Supadata account" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "deepSeekApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2016, 344],
+      "id": "63c31e32-0578-4e3b-87ef-ffa5d52bdcb2",
+      "name": "API DeepSeek - Analyse vidéo",
+      "credentials": {
+        "deepSeekApi": { "id": "MBt6ozX97KVIAwcD", "name": "DeepSeek account" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID_VIDEOS_YOUTUBE",
+          "mode": "list",
+          "cachedResultName": "LISTE DES VIDEOS YOUTUBE ANALYSER",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID_VIDEOS_YOUTUBE/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Feuille 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID_VIDEOS_YOUTUBE/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "videoId": "={{ $json.videoId }}",
+            "titre": "={{ $json.title }}",
+            "date_analyse": "={{ $now.toFormat('dd-MM-yyyy') }}",
+            "score": "={{ $json.scoreFinal }}",
+            "decision": "={{ $json.decision }}",
+            "valeur": "={{ $json.valeur }}",
+            "raison": "={{ $json.raison }}",
+            "sujet": "={{ $json.sujet }}",
+            "url": "={{ $json.url }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "videoId", "displayName": "videoId", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "titre", "displayName": "titre", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "date_analyse", "displayName": "date_analyse", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "score", "displayName": "score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "decision", "displayName": "decision", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "valeur", "displayName": "valeur", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "raison", "displayName": "raison", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "sujet", "displayName": "sujet", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "url", "displayName": "url", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2464, 344],
+      "id": "eb411f33-09eb-4fee-9539-65a3a92ed93d",
+      "name": "Sheets - Enregistre analyse",
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "rCFvQBVaQVzg9Lrq", "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [672, 416],
+      "id": "eb941ed4-57c9-4964-91cb-dfd9ea071fa2",
+      "name": "Merge - Playlists + Analysées"
+    },
+    {
+      "parameters": {
+        "jsCode": "var all = $input.all();\nvar now = new Date().getTime();\nvar seen = {};\nvar videos = [];\nvar dejaAnalyses = [];\n\n// Première passe — collecte les IDs déjà analysés depuis Google Sheets\nall.forEach(function(item) {\n  var d = item.json;\n  if (d.videoId && !d.contentDetails && !d.snippet) {\n    dejaAnalyses.push(d.videoId);\n  }\n});\n\n// Deuxième passe — traite les items YouTube\nall.forEach(function(item) {\n  var d = item.json;\n\n  // Ignore les lignes Google Sheets\n  if (d.videoId && !d.contentDetails && !d.snippet) return;\n\n  var videoId = d.contentDetails && d.contentDetails.videoId\n    ? d.contentDetails.videoId\n    : null;\n\n  if (!videoId) return;\n  if (seen[videoId] || dejaAnalyses.includes(videoId)) return;\n  seen[videoId] = true;\n\n  var title       = (d.snippet && d.snippet.title) || '';\n  var description = ((d.snippet && d.snippet.description) || '').slice(0, 500);\n  var publishedAt = (d.snippet && d.snippet.publishedAt)\n    || (d.contentDetails && d.contentDetails.videoPublishedAt) || '';\n\n  var titleLower = title.toLowerCase();\n  var sujet = 'autre';\n  if (titleLower.match(/\\b(ia|ai|gpt|llm|claude|gemini|mistral|agent|deepseek|machine learning|intelligence artificielle|automation|automatisation)\\b/)) {\n    sujet = 'IA';\n  } else if (titleLower.match(/\\b(seo|référencement|google|search|serp|backlink|keyword|mot.clé|netlinking|contenu|content)\\b/)) {\n    sujet = 'SEO';\n  }\n\n  var videoDate = publishedAt ? new Date(publishedAt).getTime() : 0;\n  var ageJours  = videoDate ? Math.floor((now - videoDate) / (1000 * 60 * 60 * 24)) : 999;\n\n  var poidsDate;\n  if (ageJours <= 7)        poidsDate = 5;\n  else if (ageJours <= 30)  poidsDate = 4;\n  else if (ageJours <= 90)  poidsDate = 3;\n  else if (ageJours <= 180) poidsDate = 2;\n  else if (ageJours <= 365) poidsDate = 1;\n  else                      poidsDate = 0;\n\n  var poidsSujet = (sujet === 'IA' || sujet === 'SEO') ? 2 : 0;\n  var scoreInitial = poidsDate + poidsSujet;\n\n  videos.push({\n    videoId:      videoId,\n    title:        title,\n    description:  description,\n    sujet:        sujet,\n    ageJours:     ageJours,\n    publishedAt:  publishedAt,\n    scoreInitial: scoreInitial,\n    url:          'https://youtube.com/watch?v=' + videoId\n  });\n});\n\nvideos.sort(function(a, b) { return b.scoreInitial - a.scoreInitial; });\nvideos = videos.slice(0, 70);\n\nreturn videos.map(function(v) { return { json: v }; });"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [896, 416],
+      "id": "ce2386fc-2df2-4737-b30a-7a509784d7b5",
+      "name": "Code JS - Dédoublonne + Pondère"
+    },
+    {
+      "parameters": {
+        "jsCode": "var video       = $('Boucle - Vidéos à analyser').item.json;\nvar transcript  = $input.first().json.content || $input.first().json.transcript || '';\n\n// Tronque la transcription à 3000 chars\nvar transcriptCourt = transcript.slice(0, 3000);\n\n// Si pas de transcription, utilise la description\nif (!transcriptCourt || transcriptCourt.length < 50) {\n  transcriptCourt = video.description || '(pas de transcription disponible)';\n}\n\nvar body = {\n  model: \"deepseek-v4-flash\",\n  temperature: 0.2,\n  messages: [\n    {\n  role: \"system\",\n  content: \"Tu es un assistant personnel de curation vidéo pour l'utilisateur, entrepreneur basé à Lille, spécialisé dans le no-code/automatisation (n8n) et le développement web (Node.js, Docker). Il suit une veille active sur deux sujets prioritaires :\\n\\n\" +\n\n\n    \n  \"- IA & AUTOMATISATION : agents IA, LLM, outils no-code, n8n, workflows, Claude, DeepSeek, prompt engineering. Il est praticien avancé — les tutoriels basiques ne l'intéressent pas, il veut des insights nouveaux, des cas d'usage concrets, des comparatifs techniques.\\n\\n\" +\n\n\n\n    \n  \"- SEO : référencement local, Google Ads, stratégie de contenu, outils SEO, algorithmes Google. Contexte business : site EMA Fuites (détection fuite d'eau, Hauts-de-France). Il veut des tactiques applicables rapidement.\\n\\n\" +\n  \"Critères de scoring :\\n\" +\n\n\n    \"- CULTURE GÉNÉRALE : vidéos intéressantes intellectuellement mais sans application directe au no-code/SEO. Sciences, société, IA et cerveau, vulgarisation tech, prospective. L'utilisateur peut les regarder en mode détente. Score 5-7 possible même si non actionnable.\\n\\n\" +\n\n\n    \n  \"- Score 8-10 : contenu avancé, nouveauté forte, directement applicable, créateur reconnu\\n\" +\n  \"- Score 5-7 : contenu intéressant mais pas urgent, ou partiellement pertinent\\n\" +\n  \"- Score 1-4 : tutoriel basique, contenu déjà connu, hors sujet, ou trop ancien pour être pertinent\\n\\n\" +\n\n    \n  \"Pour les vidéos IA de plus de 6 mois, baisse le score de 2 points car le domaine évolue très vite.\\n\" +\n  \"Pour les vidéos SEO, l'ancienneté est moins pénalisante — les fondamentaux restent valides.\\n\\n\" +\n  \"Tu réponds UNIQUEMENT en JSON valide sans backticks.\"\n\n\n},\n{\n  role: \"user\",\n  content: `\nTitre : ${video.title}\n\nSujet détecté : ${video.sujet}\n\nÂge : ${video.ageJours} jours\n\nTranscription/Description :\n${transcriptCourt}\n\nRéponds avec ce JSON :\n\n{\n  \"score\": entier de 1 à 10,\n\"  \\\"decision\\\": \\\"VOIR\\\" | \\\"PLUS_TARD\\\" | \\\"CULTURE_G\\\" | \\\"IGNORER\\\",\\n\" +\n\n\"valeur\": \"ce que l'utilisateur va concrètement apprendre ou retirer de cette vidéo, en 1 phrase\",\n  \"resume\": [\n    \"point clé 1\",\n    \"point clé 2\",\n    \"point clé 3\"\n  ],\n  \"raison_decision\": \"justification en 15 mots max\",\n  \"temps_estime\": \"durée de visionnage recommandée (ex: 20 min, skip)\"\n}\n`\n}\n]\n};\n\n\n    \n\nreturn [{\n  json: {\n    body: body,\n    video: video\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1792, 344],
+      "id": "329a4e3c-9b8d-40ac-a122-ea8e2bc19cf1",
+      "name": "Code JS - Prépare prompt DeepSeek"
+    },
+    {
+      "parameters": {
+        "jsCode": "var video = $('Boucle - Vidéos à analyser').item.json;\nvar raw   = $input.first().json.choices[0].message.content.trim();\n\nif (!video || !video.videoId) {\n  return [{ json: { skip: true } }];\n}\n\nvar analyse;\ntry {\n  analyse = JSON.parse(raw);\n} catch(e) {\n  analyse = { score: 5, decision: 'PLUS_TARD', valeur: '', resume: [], raison_decision: 'Erreur parsing', temps_estime: '?' };\n}\n\nreturn [{\n  json: {\n    videoId:      video.videoId,\n    title:        video.title,\n    url:          video.url,\n    sujet:        video.sujet,\n    ageJours:     video.ageJours,\n    scoreInitial: video.scoreInitial,\n    scoreIA:      analyse.score,\n    scoreFinal:   Math.round((video.scoreInitial + analyse.score) / 2),\n    decision:     analyse.decision,\n    resume:       analyse.resume || [],\n    raison:       analyse.raison_decision,\n    tempsEstime:  analyse.temps_estime,\n    valeur:       analyse.valeur || ''\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 344],
+      "id": "24f7048b-197e-4a8d-b00c-e438eeeaba28",
+      "name": "Code JS - Parse + Enrichit"
+    },
+    {
+      "parameters": {
+        "jsCode": "var all = $input.all();\n\nvar stripHtml = function(str) {\n  return (str || '')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&quot;/g, '\"')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&amp;/g, '&');\n};\n\nvar videos = all\n  .map(function(item) { return item.json; })\n  .filter(function(v) { return v && v.videoId; });\n\nvideos.sort(function(a, b) { return b.score - a.score; });\n\nvar aVoir    = videos.filter(function(v) { return v.decision === 'VOIR'; });\nvar plusTard = videos.filter(function(v) { return v.decision === 'PLUS_TARD'; });\nvar cultureG = videos.filter(function(v) { return v.decision === 'CULTURE_G'; });\nvar aIgnorer = videos.filter(function(v) { return v.decision === 'IGNORER'; });\n\nvar date = new Date().toLocaleDateString('fr-FR');\nvar messages = [];\nvar current =\n  '🎬 <b>Analyse Playlist YouTube</b>\\n' +\n  '📅 ' + date + '\\n' +\n  '📊 ' + videos.length + ' vidéos · ' +\n  '✅ ' + aVoir.length + ' à voir · ' +\n  '⏳ ' + plusTard.length + ' plus tard · ' +\n  '🧠 ' + cultureG.length + ' culture G · ' +\n  '❌ ' + aIgnorer.length + ' ignorées\\n' +\n  '─────────────────\\n';\n\n// ✅ À VOIR\nif (aVoir.length > 0) {\n  current += '\\n✅ <b>À VOIR (' + aVoir.length + ')</b>\\n';\n\n  aVoir.forEach(function(v) {\n    var sujet = v.sujet || '';\n    var emoji = sujet === 'IA' ? '🤖' : sujet === 'SEO' ? '🔍' : '📺';\n    var url   = v.url || 'https://youtube.com/watch?v=' + v.videoId;\n    var block =\n      '\\n' + emoji + ' <b>' + stripHtml(v.titre || v.title || '') + '</b>\\n' +\n      '💡 ' + (v.valeur || '') + '\\n' +\n      '⭐ Score : ' + (v.score || '') + '/10\\n' +\n      '🔗 ' + url + '\\n\\n';  // ← double saut ici\n\n    if ((current + block).length > 4000) {\n      messages.push(current);\n      current = '🎬 <b>Analyse YouTube (suite)</b>\\n' + block;\n    } else {\n      current += block;\n    }\n  });\n}\n\n// ⏳ PLUS TARD\nif (plusTard.length > 0) {\n  var header = '\\n─────────────────\\n⏳ <b>À VOIR PLUS TARD (' + plusTard.length + ')</b>\\n';\n  if ((current + header).length > 4000) {\n    messages.push(current);\n    current = '🎬 <b>Analyse YouTube (suite)</b>\\n' + header;\n  } else {\n    current += header;\n  }\n\n  plusTard.forEach(function(v) {\n    var sujet = v.sujet || '';\n    var emoji = sujet === 'IA' ? '🤖' : sujet === 'SEO' ? '🔍' : '📺';\n    var url   = v.url || 'https://youtube.com/watch?v=' + v.videoId;\n    var block =\n      '\\n' + emoji + ' <b>' + stripHtml(v.titre || v.title || '') + '</b>\\n' +\n      '💡 ' + (v.valeur || '') + '\\n' +\n      '⭐ ' + (v.score || '') + '/10 · ' + (v.raison || '') + '\\n' +\n      '🔗 ' + url + '\\n\\n';  // ← double saut ici\n\n    if ((current + block).length > 4000) {\n      messages.push(current);\n      current = '🎬 <b>Analyse YouTube (suite)</b>\\n' + block;\n    } else {\n      current += block;\n    }\n  });\n}\n\n// 🧠 CULTURE G\nif (cultureG.length > 0) {\n  var header = '\\n─────────────────\\n🧠 <b>CULTURE G (' + cultureG.length + ')</b>\\n';\n  if ((current + header).length > 4000) {\n    messages.push(current);\n    current = '🎬 <b>Analyse YouTube (suite)</b>\\n' + header;\n  } else {\n    current += header;\n  }\n\n  cultureG.forEach(function(v) {\n    var url  = v.url || 'https://youtube.com/watch?v=' + v.videoId;\n    var block =\n      '\\n• <b>' + stripHtml(v.titre || v.title || '') + '</b>\\n' +\n      '💡 ' + (v.valeur || '') + '\\n' +\n      '🔗 ' + url + '\\n\\n';  // ← double saut ici\n\n    if ((current + block).length > 4000) {\n      messages.push(current);\n      current = '🎬 <b>Analyse YouTube (suite)</b>\\n' + block;\n    } else {\n      current += block;\n    }\n  });\n}\n\n// ❌ IGNORER\nif (aIgnorer.length > 0) {\n  var ignorerHeader = '\\n─────────────────\\n❌ <b>À IGNORER (' + aIgnorer.length + ')</b>\\n';\n  if ((current + ignorerHeader).length > 4000) {\n    messages.push(current);\n    current = '🎬 <b>Analyse YouTube (suite)</b>\\n' + ignorerHeader;\n  } else {\n    current += ignorerHeader;\n  }\n\n  aIgnorer.forEach(function(v) {\n    var ligne = '• ' + stripHtml(v.titre || v.title || '') + '\\n';\n    if ((current + ligne).length > 4000) {\n      messages.push(current);\n      current = '🎬 <b>Analyse YouTube (suite)</b>\\n' + ligne;\n    } else {\n      current += ligne;\n    }\n  });\n}\n\ncurrent += '\\n─────────────────\\n🤖 <i>Analysé par DeepSeek V4-Flash</i>';\nmessages.push(current);\n\nreturn messages.map(function(msg) { return { json: { message: msg } }; });"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2688, 344],
+      "id": "be0137b4-be6c-4df6-a595-0ab080903245",
+      "name": "Code JS - Agrège + Trie + Formate"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "additionalFields": { "appendAttribution": false, "parse_mode": "HTML" }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2912, 416],
+      "id": "ed2ef5da-fd5c-433f-9a6f-eb84b20d368c",
+      "name": "Telegram - Envoie rapport YouTube",
+      "webhookId": "f9ca7695-01f3-46bb-8dd0-2aec1143d91b",
+      "credentials": {
+        "telegramApi": { "id": "kE1pKqsaZAMa2DgZ", "name": "RadarDigest_clem58790_Bot" }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger - Résumé hebdo YouTube": {
+      "main": [
+        [
+          { "node": "YouTube - Playlist IA/SEO", "type": "main", "index": 0 },
+          { "node": "YouTube - Playlist veille", "type": "main", "index": 0 },
+          { "node": "Google Sheets - Videos analysées", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "YouTube - Playlist IA/SEO": { "main": [[{ "node": "Merge - Playlists YouTube", "type": "main", "index": 0 }]] },
+    "YouTube - Playlist veille": { "main": [[{ "node": "Merge - Playlists YouTube", "type": "main", "index": 1 }]] },
+    "Merge - Playlists YouTube": { "main": [[{ "node": "Merge - Playlists + Analysées", "type": "main", "index": 0 }]] },
+    "Google Sheets - Videos analysées": { "main": [[{ "node": "Merge - Playlists + Analysées", "type": "main", "index": 1 }]] },
+    "Boucle - Vidéos à analyser": {
+      "main": [
+        [],
+        [{ "node": "Attente - Anti-rate limit", "type": "main", "index": 0 }]
+      ]
+    },
+    "Attente - Anti-rate limit": { "main": [[{ "node": "Supadata - Transcript vidéo", "type": "main", "index": 0 }]] },
+    "Supadata - Transcript vidéo": { "main": [[{ "node": "Code JS - Prépare prompt DeepSeek", "type": "main", "index": 0 }]] },
+    "API DeepSeek - Analyse vidéo": { "main": [[{ "node": "Code JS - Parse + Enrichit", "type": "main", "index": 0 }]] },
+    "Merge - Playlists + Analysées": { "main": [[{ "node": "Code JS - Dédoublonne + Pondère", "type": "main", "index": 0 }]] },
+    "Sheets - Enregistre analyse": { "main": [[{ "node": "Code JS - Agrège + Trie + Formate", "type": "main", "index": 0 }]] },
+    "Code JS - Dédoublonne + Pondère": { "main": [[{ "node": "Boucle - Vidéos à analyser", "type": "main", "index": 0 }]] },
+    "Code JS - Prépare prompt DeepSeek": { "main": [[{ "node": "API DeepSeek - Analyse vidéo", "type": "main", "index": 0 }]] },
+    "Code JS - Parse + Enrichit": { "main": [[{ "node": "Sheets - Enregistre analyse", "type": "main", "index": 0 }]] },
+    "Code JS - Agrège + Trie + Formate": { "main": [[{ "node": "Telegram - Envoie rapport YouTube", "type": "main", "index": 0 }]] },
+    "Telegram - Envoie rapport YouTube": { "main": [[{ "node": "Boucle - Vidéos à analyser", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": ["MARKETING", "VEILLE"]
+}

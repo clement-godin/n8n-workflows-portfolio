@@ -1,0 +1,272 @@
+{
+  "name": "EMA - SETTER IA",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ema-setter",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "bb85c019-cf68-41a5-9c61-8848550e3d58",
+      "name": "Webhook - Setter IA",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [256, 304],
+      "webhookId": "faea8f0d-3ac2-4d18-877c-88e7147021b7",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst prospect_nom = body.prospect_nom || '';\nconst prospect_entreprise = body.prospect_entreprise || '';\nconst persona = body.persona || 'A';\nconst message_recu = body.message_recu || '';\nconst historique = body.historique_conversation || '';\nconst canal = body.canal || 'email';\n\nconst prompt = `Tu es commercial pour EMAFUITES, détection de fuites non destructive Nord/Hauts-de-France. Tu reçois une réponse d'un prospect B2B à un message de prospection. Réponds UNIQUEMENT en JSON valide sans backticks.\n\nProspect : ${prospect_nom} — ${prospect_entreprise} (Persona ${persona})\nCanal : ${canal}\nHistorique : ${historique}\nMessage reçu : ${message_recu}\n\nÉTAPE 1 — Analyse :\nClassifie l'intention parmi : INTÉRÊT_FORT | CURIOSITÉ | POLITESSE_FROIDE | OBJECTION | REFUS\nIdentifie le ton : formel | décontracté | pressé\n\nÉTAPE 2 — Génère la réponse selon l'intention :\n- INTÉRÊT_FORT → proposer directement 2 créneaux (mardi ou jeudi 9h-12h)\n- CURIOSITÉ → apporter 1 élément de valeur concret (cas similaire, stat), pas de pitch\n- POLITESSE_FROIDE → message court, proposer de revenir dans 30 jours\n- OBJECTION → désamorcer sans attaque frontale, élargir la réflexion\n- REFUS → remercier, sortir proprement\n\nRÈGLES STRICTES :\n- Maximum 1 question par message\n- Matcher la longueur du message reçu (court = court)\n- Toujours apporter de la valeur, jamais de pression\n- Jamais forcer un appel si le prospect n'est pas prêt\n- Interdits : 'n'hésitez pas', 'cordialement', 'super', 'génial'\n\nRéponds : {\"intention\": \"...\", \"ton_détecté\": \"...\", \"réponse_suggérée\": \"texte complet\", \"action_suivante\": \"CALL|NURTURING_30J|ÉCARTÉ\", \"note_crm\": \"résumé court pour le CRM\"}`;\n\nreturn [{json: {\n  ...body,\n  claudeBody: {model: \"claude-sonnet-4-6\", max_tokens: 1000, messages: [{role: \"user\", content: prompt}]}\n}}];"
+      },
+      "id": "872d8749-0620-4f43-9c58-e73616b73137",
+      "name": "Code - Préparer Setter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 304]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.claudeBody) }}",
+        "options": {}
+      },
+      "id": "429814c6-554c-4d13-9be3-419af9b0badb",
+      "name": "Claude - Setter Analyse",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [704, 304],
+      "credentials": {
+        "anthropicApi": {
+          "id": "8Wcb8jgMTJM6CQjM",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst orig = $('Code - Préparer Setter').item.json;\nlet parsed;\ntry { parsed = JSON.parse(resp.content[0].text); }\ncatch(e) { parsed = {intention: 'ERREUR', 'ton_détecté': '', 'réponse_suggérée': '', action_suivante: 'NURTURING_30J', note_crm: 'Erreur parsing'}; }\nreturn [{json: {\n  ...orig,\n  intention: parsed.intention,\n  ton: parsed['ton_détecté'],\n  reponse: parsed['réponse_suggérée'],\n  action: parsed.action_suivante,\n  note_crm: parsed.note_crm\n}}];"
+      },
+      "id": "fdfef65b-7446-49c5-b321-ef7cc6c837eb",
+      "name": "Code - Parser Setter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [928, 304]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "ffebd24d-88d6-4472-bd68-0b04c770abe0",
+              "leftValue": "={{ $json.row_id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8b901ad7-a666-4a46-bc2d-039870931cfe",
+      "name": "IF - Row ID fourni",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1152, 304]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.row_id }}",
+            "Intention_réponse": "={{ $json.intention }}",
+            "Notes": "={{ $json.note_crm }}"
+          },
+          "matchingColumns": ["ID"],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "94478203-c31a-4dc3-82ef-a3d7ed240fbe",
+      "name": "GSheets - Update CRM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1376, 208],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=📨 *Réponse prospect à traiter*\n\n*{{ $json.prospect_nom }}* — {{ $json.prospect_entreprise }}\nIntention : {{ $json.intention }} | Action : {{ $json.action }}\n\n💬 *Réponse suggérée :*\n{{ $json.reponse }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "4c8ba872-4c70-45f7-a267-952d558c5d85",
+      "name": "Telegram - Réponse à traiter",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1600, 208],
+      "webhookId": "a9a8c0e8-196c-4fbf-b8c6-3d026be050ec",
+      "credentials": {
+        "telegramApi": {
+          "id": "RaG5QR5En7OmVEPM",
+          "name": "scoring_lead_auto_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=📨 *Réponse prospect à traiter*\n\n*{{ $json.prospect_nom }}* — {{ $json.prospect_entreprise }}\nIntention : {{ $json.intention }} | Action : {{ $json.action }}\n\n💬 *Réponse suggérée :*\n{{ $json.reponse }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "ca2d6f96-15af-427b-9c46-7f970ba0af96",
+      "name": "Telegram - Réponse (sans CRM)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1376, 400],
+      "webhookId": "166726ff-2ac8-4876-89af-3aa3bc97c3dc",
+      "credentials": {
+        "telegramApi": {
+          "id": "RaG5QR5En7OmVEPM",
+          "name": "scoring_lead_auto_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "e506b4f0-0735-4e8f-8419-cd4ebac724b5",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "ÉCARTÉ",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "81096e31-82f3-4072-99e9-a3af58868376",
+      "name": "IF - Action ÉCARTÉ",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1824, 208]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Prospects"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ID": "={{ $json.row_id }}",
+            "Statut": "ÉCARTÉ"
+          },
+          "matchingColumns": ["ID"],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "99d700a9-1309-4e29-ba8e-554bcec609ee",
+      "name": "GSheets - Marquer ÉCARTÉ",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2048, 208],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Setter IA": {"main": [[{"node": "Code - Préparer Setter", "type": "main", "index": 0}]]},
+    "Code - Préparer Setter": {"main": [[{"node": "Claude - Setter Analyse", "type": "main", "index": 0}]]},
+    "Claude - Setter Analyse": {"main": [[{"node": "Code - Parser Setter", "type": "main", "index": 0}]]},
+    "Code - Parser Setter": {"main": [[{"node": "IF - Row ID fourni", "type": "main", "index": 0}]]},
+    "IF - Row ID fourni": {"main": [[{"node": "GSheets - Update CRM", "type": "main", "index": 0}], [{"node": "Telegram - Réponse (sans CRM)", "type": "main", "index": 0}]]},
+    "GSheets - Update CRM": {"main": [[{"node": "Telegram - Réponse à traiter", "type": "main", "index": 0}]]},
+    "Telegram - Réponse à traiter": {"main": [[{"node": "IF - Action ÉCARTÉ", "type": "main", "index": 0}]]},
+    "IF - Action ÉCARTÉ": {"main": [[{"node": "GSheets - Marquer ÉCARTÉ", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  }
+}

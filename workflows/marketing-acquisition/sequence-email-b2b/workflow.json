@@ -1,0 +1,346 @@
+{
+  "name": "SÉQUENCE EMAIL B2B",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours" }] }
+      },
+      "id": "59d9d076-4540-43ec-8c82-60c4f889a53a",
+      "name": "Trigger - Séquence email B2B",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [256, 496]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "b2b-start-sequence",
+        "responseMode": "lastNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "8ba0c567-0d0f-4b98-8737-f5602b3be002",
+      "name": "Webhook - Démarrer séquence B2B",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [256, 1104],
+      "webhookId": "a902cd95-9e77-436f-9dd3-43c6ab161f5f",
+      "notes": "Appeler ce webhook avec {contactId, email, prenom, nom, societe} pour démarrer la séquence sur un contact",
+      "credentials": {
+        "httpHeaderAuth": { "id": "G5SBA0FXpVZKTBj6", "name": "n8n Internal Webhook Secret" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"filterGroups\": [{\"filters\": [{\"propertyName\": \"sequence_b2b_etape\", \"operator\": \"LTE\", \"value\": \"4\"}, {\"propertyName\": \"sequence_b2b_date_debut\", \"operator\": \"HAS_PROPERTY\"}]}], \"properties\": [\"firstname\", \"lastname\", \"email\", \"company\", \"sequence_b2b_etape\", \"sequence_b2b_date_debut\"], \"limit\": 50}",
+        "options": {}
+      },
+      "id": "08de1bc9-1ae2-45d2-abf0-0b4a6a6639c2",
+      "name": "HubSpot - Contacts B2B à traiter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [480, 496],
+      "credentials": {
+        "hubspotAppToken": { "id": "JnaOUFzIE4lA3O1R", "name": "HubSpot account EMA FUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Find B2B contacts where next email is due\nconst result = $input.first().json;\nconst contacts = result.results || [];\nconst now = new Date();\nconst toProcess = [];\n\nfor (const c of contacts) {\n  const props = c.properties || {};\n  const etape = parseInt(props.sequence_b2b_etape || '0');\n  const nextDate = props.sequence_b2b_date_debut ? new Date(props.sequence_b2b_date_debut) : null;\n  \n  // Only process if next step date is in the past\n  if (nextDate && nextDate <= now && etape < 5) {\n    toProcess.push({ json: {\n      contactId: c.id,\n      email: props.email || '',\n      prenom: props.firstname || 'Madame/Monsieur',\n      nom: props.lastname || '',\n      societe: props.company || '',\n      etape: etape\n    }});\n  }\n}\n\nif (toProcess.length === 0) return [];\nreturn toProcess;\n"
+      },
+      "id": "4bdc4b02-4914-4bbe-8f93-0d9ef752bfb2",
+      "name": "Code JS - Filtrer contacts B2B",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [704, 496],
+      "notes": "Filtre les contacts dont la prochaine étape est due"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"filterGroups\": [{\"filters\": [{\"propertyName\": \"associations.contact\", \"operator\": \"EQ\", \"value\": \"{{ $json.contactId }}\"}, {\"propertyName\": \"dealstage\", \"operator\": \"EQ\", \"value\": \"3422415597\"}]}], \"properties\": [\"dealstage\"], \"limit\": 1}",
+        "options": {}
+      },
+      "id": "64e0dfd6-7a7c-4c1c-a8e2-fe624dc39b2e",
+      "name": "HubSpot - Vérifier statut deal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [928, 496],
+      "credentials": {
+        "hubspotAppToken": { "id": "JnaOUFzIE4lA3O1R", "name": "HubSpot account EMA FUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 2, "leftValue": "", "caseSensitive": true, "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.total || 0) }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" },
+              "id": "condition-1781283419162-4sgjh50ok"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9153d6fc-bf9d-4313-a7e8-f93015c85ca6",
+      "name": "Si - Déjà client",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1152, 496],
+      "notes": "Si total > 0, le contact est déjà client — on ne l'envoie pas"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"sequence_b2b_etape\": \"0\", \"sequence_b2b_date_debut\": \"{{ new Date().toISOString() }}\"}}",
+        "options": {}
+      },
+      "id": "6e581a4f-7259-45d5-92c1-0f88c9d2fa24",
+      "name": "HubSpot - Init contact B2B",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [480, 1104],
+      "credentials": {
+        "hubspotAppToken": { "id": "JnaOUFzIE4lA3O1R", "name": "HubSpot account EMA FUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  { "leftValue": "={{ $json.etape }}", "rightValue": 0, "operator": { "type": "number", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "0"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  { "leftValue": "={{ $json.etape }}", "rightValue": 1, "operator": { "type": "number", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "1"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  { "leftValue": "={{ $json.etape }}", "rightValue": 2, "operator": { "type": "number", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "2"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  { "leftValue": "={{ $json.etape }}", "rightValue": 3, "operator": { "type": "number", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "3"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  { "leftValue": "={{ $json.etape }}", "rightValue": 4, "operator": { "type": "number", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "4"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1b1b181c-7f4f-4699-b098-a94ece17c1e2",
+      "name": "Switch - Étape séquence",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [1376, 448]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "EMA Fuites — Détection de fuite non destructive en Nord/Hauts-de-France",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nJe me permets de vous contacter au nom d'<b>EMA Fuites</b>, société spécialisée dans la détection de fuites d'eau non destructive en Nord / Hauts-de-France.<br><br>\nNotre expertise vous intéresse peut-être dans le cadre de votre activité :<br>\n✅ <b>Technologie non destructive</b> : pas de casse, pas de travaux inutiles<br>\n✅ <b>Rapport technique détaillé</b> avec localisation précise de la fuite<br>\n✅ <b>Interventions rapides</b> sur tout le Nord et les Hauts-de-France<br>\n✅ <b>Certifications professionnelles</b> reconnues<br><br>\nNous travaillons régulièrement avec des syndics de copropriété, bailleurs sociaux et experts d'assurance pour résoudre rapidement les sinistres fuite.<br><br>\nSeriez-vous disponible pour un échange de 15 minutes cette semaine ?<br><br>\nCordialement,<br><b>EMA Fuites</b>",
+        "options": {}
+      },
+      "id": "9bd5a9b7-d5e5-47d7-a17b-4e8c22027bb5",
+      "name": "Gmail - Email B2B étape 0",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1600, 112],
+      "webhookId": "a2dfc2bb-4272-49bb-93f2-d49a60ca7fa6",
+      "credentials": {
+        "gmailOAuth2": { "id": "5KWmGq134q2eiYyC", "name": "COMPTE GMAIL EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Cas pratique : fuite en copropriété résolue en 48h — EMA Fuites",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nSuite à mon premier message, je souhaitais vous partager un <b>exemple concret</b> de notre intervention récente.<br><br>\n<b>Contexte :</b> Une copropriété de 24 lots avec une fuite d'eau en plancher chauffant depuis plusieurs semaines.<br><br>\n<b>Notre intervention :</b><br>\n• Diagnostic par géophone électronique en 3 heures<br>\n• Localisation précise sans ouverture de chape<br>\n• Rapport technique remis sous 24h au syndic et à l'assurance<br>\n• Réparation ciblée par le plombier en 2 heures<br><br>\n<b>Résultat :</b> Économie d'environ 8 000€ par rapport à une recherche destructive traditionnelle.<br><br>\nCe type d'intervention peut vous intéresser pour vos copropriétés / patrimoines gérés. Souhaitez-vous en discuter ?<br><br>\nCordialement,<br><b>EMA Fuites</b>",
+        "options": {}
+      },
+      "id": "51c992c4-5cc9-4141-80b9-1e61ff9a6148",
+      "name": "Gmail - Email B2B étape 1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1600, 304],
+      "webhookId": "cb691a6a-8eba-4263-a3cb-c999ad92367d",
+      "credentials": {
+        "gmailOAuth2": { "id": "5KWmGq134q2eiYyC", "name": "COMPTE GMAIL EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Comment nos rapports facilitent les remboursements d'assurance — EMA Fuites",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nNos <b>rapports techniques de détection</b> sont spécifiquement conçus pour faciliter les dossiers sinistres auprès des assurances.<br><br>\nIls incluent :<br>\n📋 <b>Localisation GPS précise</b> de la fuite avec photos<br>\n📋 <b>Méthode de détection utilisée</b> (gaz traceur, géophone, caméra thermique)<br>\n📋 <b>Estimation des dégâts</b> et préconisation de réparation<br>\n📋 <b>Format reconnu par les compagnies d'assurance</b> majeures<br><br>\nPlusieurs experts en sinistres de la région nous recommandent justement pour la <b>qualité et la rapidité</b> de nos rapports.<br><br>\nAvez-vous des sinistres en cours pour lesquels nous pourrions intervenir ?<br><br>\nCordialement,<br><b>EMA Fuites</b>",
+        "options": {}
+      },
+      "id": "ec69849f-c296-49e5-bbcb-3bcd84bf23f0",
+      "name": "Gmail - Email B2B étape 2",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1600, 496],
+      "webhookId": "a111cdfe-cc6e-49f5-8807-7e6dd9ce0057",
+      "credentials": {
+        "gmailOAuth2": { "id": "5KWmGq134q2eiYyC", "name": "COMPTE GMAIL EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Ce que nous disent nos partenaires syndics — EMA Fuites",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nVoici ce que témoigne l'un de nos partenaires syndics du Nord :<br><br>\n<i>\"Depuis que nous faisons appel à EMA Fuites, nos dossiers sinistres fuite sont résolus 2 fois plus vite. Leurs rapports sont immédiatement acceptés par nos assureurs et nos copropriétaires apprécient l'absence de dégâts lors de la recherche.\"</i><br><br>\nNous accompagnons aujourd'hui plusieurs syndics, bailleurs sociaux et gestionnaires de patrimoine en Hauts-de-France avec des <b>tarifs préférentiels pour les volumes</b>.<br><br>\nJe serais ravi de vous présenter notre offre partenaire. Un appel cette semaine vous conviendrait-il ?<br><br>\nCordialement,<br><b>EMA Fuites</b>",
+        "options": {}
+      },
+      "id": "b031f55e-b2ae-4d32-8336-956868ba5f5a",
+      "name": "Gmail - Email B2B étape 3",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1600, 688],
+      "webhookId": "ad57640e-a50e-427e-bf99-aced60dd0885",
+      "credentials": {
+        "gmailOAuth2": { "id": "5KWmGq134q2eiYyC", "name": "COMPTE GMAIL EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Offre partenariat prescripteur — EMA Fuites",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nPour clore cette série de messages, je souhaitais vous présenter notre <b>programme partenaire prescripteur</b>.<br><br>\n<b>En nous recommandant à vos clients / copropriétaires :</b><br>\n🤝 <b>Commission sur chaque apport d'affaires</b><br>\n📞 <b>Ligne directe prioritaire</b> pour vos urgences<br>\n⚡ <b>Intervention garantie sous 48h</b> pour vos dossiers<br>\n📋 <b>Rapport express 24h</b> pour vos dossiers assurance<br><br>\nPlusieurs de vos confrères de la région bénéficient déjà de ce partenariat.<br><br>\nSi vous souhaitez en savoir plus, n'hésitez pas à me répondre directement ou à m'appeler.<br><br>\nBien cordialement,<br><b>EMA Fuites</b><br>📞 Détection de fuites non destructive — Nord / Hauts-de-France",
+        "options": {}
+      },
+      "id": "c9be5006-6754-4329-9f4f-aadd7aaeb32b",
+      "name": "Gmail - Email B2B étape 4",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1600, 880],
+      "webhookId": "09cc2821-e8bf-4c02-88f3-9d8ecda9f139",
+      "credentials": {
+        "gmailOAuth2": { "id": "5KWmGq134q2eiYyC", "name": "COMPTE GMAIL EMAFUITES" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Calculate next step date\nconst contact = $('Code JS - Filtrer contacts B2B').item.json;\nconst etape = contact.etape;\nconst delays = [0, 3, 7, 14, 30];\n\n// Next step delay (days)\nconst nextEtape = etape + 1;\nconst nextDelay = nextEtape < delays.length ? delays[nextEtape] - delays[etape] : null;\nconst nextDate = nextDelay !== null ? new Date(Date.now() + nextDelay * 24 * 3600 * 1000).toISOString() : null;\n\nreturn [{ json: {\n  contactId: contact.contactId,\n  newEtape: nextEtape,\n  nextDate: nextDate,\n  isLastStep: nextEtape >= 5\n}}];\n"
+      },
+      "id": "4bab3015-3d2e-49b1-8aca-ee665a4ba019",
+      "name": "Code JS - Calculer prochaine étape",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1824, 496]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"sequence_b2b_etape\": \"{{ $json.newEtape }}\", \"sequence_b2b_date_debut\": {{ $json.nextDate ? '\"' + $json.nextDate + '\"' : 'null' }}}}",
+        "options": {}
+      },
+      "id": "dad913e6-7239-4db6-9157-615b534f97c9",
+      "name": "HubSpot - Update étape B2B",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2048, 496],
+      "credentials": {
+        "hubspotAppToken": { "id": "JnaOUFzIE4lA3O1R", "name": "HubSpot account EMA FUITES" }
+      },
+      "notes": "Met à jour l'étape et la date du prochain email B2B"
+    }
+  ],
+  "connections": {
+    "Trigger - Séquence email B2B": { "main": [[{ "node": "HubSpot - Contacts B2B à traiter", "type": "main", "index": 0 }]] },
+    "Webhook - Démarrer séquence B2B": { "main": [[{ "node": "HubSpot - Init contact B2B", "type": "main", "index": 0 }]] },
+    "HubSpot - Contacts B2B à traiter": { "main": [[{ "node": "Code JS - Filtrer contacts B2B", "type": "main", "index": 0 }]] },
+    "Code JS - Filtrer contacts B2B": { "main": [[{ "node": "HubSpot - Vérifier statut deal", "type": "main", "index": 0 }]] },
+    "HubSpot - Vérifier statut deal": { "main": [[{ "node": "Si - Déjà client", "type": "main", "index": 0 }]] },
+    "Si - Déjà client": {
+      "main": [
+        [{ "node": "Switch - Étape séquence", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Switch - Étape séquence": {
+      "main": [
+        [{ "node": "Gmail - Email B2B étape 0", "type": "main", "index": 0 }],
+        [{ "node": "Gmail - Email B2B étape 1", "type": "main", "index": 0 }],
+        [{ "node": "Gmail - Email B2B étape 2", "type": "main", "index": 0 }],
+        [{ "node": "Gmail - Email B2B étape 3", "type": "main", "index": 0 }],
+        [{ "node": "Gmail - Email B2B étape 4", "type": "main", "index": 0 }]
+      ]
+    },
+    "Gmail - Email B2B étape 0": { "main": [[{ "node": "Code JS - Calculer prochaine étape", "type": "main", "index": 0 }]] },
+    "Gmail - Email B2B étape 1": { "main": [[{ "node": "Code JS - Calculer prochaine étape", "type": "main", "index": 0 }]] },
+    "Gmail - Email B2B étape 2": { "main": [[{ "node": "Code JS - Calculer prochaine étape", "type": "main", "index": 0 }]] },
+    "Gmail - Email B2B étape 3": { "main": [[{ "node": "Code JS - Calculer prochaine étape", "type": "main", "index": 0 }]] },
+    "Gmail - Email B2B étape 4": { "main": [[{ "node": "Code JS - Calculer prochaine étape", "type": "main", "index": 0 }]] },
+    "Code JS - Calculer prochaine étape": { "main": [[{ "node": "HubSpot - Update étape B2B", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6"
+  },
+  "tags": ["MARKETING", "EMAIL"]
+}

@@ -1,0 +1,617 @@
+{
+  "name": "SÉQUENCE OMNICANALE PARTICULIERS",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "p001-schedule",
+      "name": "Trigger - Toutes les heures",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        256,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "particulier-start-sequence",
+        "responseMode": "lastNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "p002-webhook",
+      "name": "Webhook - Démarrer séquence particulier",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        256,
+        992
+      ],
+      "webhookId": "71893828-adf7-4012-91f7-47ea7954cf8a",
+      "notes": "Appeler avec {contactId, email, phone, prenom, nom} pour démarrer la séquence",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "G5SBA0FXpVZKTBj6",
+          "name": "n8n Internal Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"filterGroups\": [{\"filters\": [{\"propertyName\": \"sequence_particulier_etape\", \"operator\": \"LTE\", \"value\": \"4\"}, {\"propertyName\": \"sequence_particulier_date_debut\", \"operator\": \"HAS_PROPERTY\"}]}], \"properties\": [\"firstname\", \"lastname\", \"email\", \"phone\", \"sequence_particulier_etape\", \"sequence_particulier_date_debut\"], \"limit\": 50}",
+        "options": {}
+      },
+      "id": "p003-hubspot-contacts",
+      "name": "HubSpot - Contacts particuliers à traiter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        384
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst contacts = result.results || [];\nconst now = new Date();\nconst toProcess = [];\n\nfor (const c of contacts) {\n  const props = c.properties || {};\n  const etape = parseInt(props.sequence_particulier_etape || '0');\n  const nextDate = props.sequence_particulier_date_debut ? new Date(props.sequence_particulier_date_debut) : null;\n\n  if (nextDate && nextDate <= now && etape < 5) {\n    toProcess.push({ json: {\n      contactId: c.id,\n      email: props.email || '',\n      phone: props.phone || '',\n      prenom: props.firstname || 'Madame/Monsieur',\n      nom: props.lastname || '',\n      etape: etape\n    }});\n  }\n}\n\nif (toProcess.length === 0) return [];\nreturn toProcess;"
+      },
+      "id": "p004-code-filtrer",
+      "name": "Code JS - Filtrer contacts particuliers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        384
+      ],
+      "notes": "Filtre les contacts dont la prochaine étape est due"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"filterGroups\": [{\"filters\": [{\"propertyName\": \"associations.contact\", \"operator\": \"EQ\", \"value\": \"{{ $json.contactId }}\"}, {\"propertyName\": \"dealstage\", \"operator\": \"EQ\", \"value\": \"3422415597\"}]}], \"properties\": [\"dealstage\"], \"limit\": 1}",
+        "options": {}
+      },
+      "id": "p005-hubspot-verif",
+      "name": "HubSpot - Vérifier statut deal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        928,
+        384
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.total || 0) }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "id": "condition-1781283228940-25sts2jdf"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "p006-if-client",
+      "name": "Si - Déjà client",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1152,
+        384
+      ],
+      "notes": "true = pas encore client → continuer. false = déjà client → stop"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.etape }}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "0"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.etape }}",
+                    "rightValue": 1,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "1"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.etape }}",
+                    "rightValue": 2,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "2"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.etape }}",
+                    "rightValue": 3,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "3"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.etape }}",
+                    "rightValue": 4,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "4"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "p007-switch",
+      "name": "Switch - Étape séquence",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1376,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Fuite d'eau chez vous ? EMA Fuites intervient sans destruction",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nVous cherchez à localiser une fuite d'eau sans casser vos murs ou votre carrelage ? <b>EMA Fuites</b> est spécialisée dans la détection non destructive en Nord / Hauts-de-France.<br><br>\n✅ <b>Pas de démolition</b> : on localise précisément avant d'intervenir<br>\n✅ <b>Rapport technique complet</b> accepté par votre assurance<br>\n✅ <b>Intervention sous 48h</b> sur toute la région<br>\n✅ <b>Devis gratuit</b> sans engagement<br><br>\nUne fuite non détectée rapidement peut causer des dégâts importants et coûteux. Notre technologie (géophone, gaz traceur, caméra thermique) localise la fuite à quelques centimètres près.<br><br>\nSouhaitez-vous un devis gratuit ou un rappel téléphonique ?<br><br>\nCordialement,<br><b>EMA Fuites</b><br>Détection non destructive — Nord / Hauts-de-France",
+        "options": {}
+      },
+      "id": "p008-email-0",
+      "name": "Gmail - Email particulier étape 0",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1600,
+        0
+      ],
+      "webhookId": "8838e1dd-1d06-43ad-aec8-9588d107e4f8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5KWmGq134q2eiYyC",
+          "name": "COMPTE GMAIL EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "+33XXXXXXXXX",
+        "to": "={{ $json.phone }}",
+        "options": {}
+      },
+      "id": "p009-sms-1",
+      "name": "Twilio - SMS particulier étape 1",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        192
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "NdJKnqLRWuEnESVv",
+          "name": "Twilio account"
+        }
+      },
+      "notes": "⚠️ Remplacer +33XXXXXXXXX par votre numéro Twilio"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/VOTRE_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"messaging_product\": \"whatsapp\", \"to\": \"{{ $json.phone.replace(/[^0-9]/g, '') }}\", \"type\": \"text\", \"text\": {\"body\": \"Bonjour {{ $json.prenom }} 👋\\nC'est EMA Fuites. Vous avez une fuite d'eau non localisée ?\\n\\nUn exemple récent : un de nos clients avait une fuite en dalle chauffante depuis 3 semaines. On l'a trouvée en 2h sans ouvrir le sol. Économie : 6 000€ de travaux évités.\\n\\nOn peut intervenir chez vous sous 48h. Devis gratuit 🔧\\nRépondez OUI pour être rappelé ou ignorez ce message.\"}}",
+        "options": {}
+      },
+      "id": "p010-whatsapp-2",
+      "name": "WhatsApp - Message particulier étape 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1600,
+        384
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      },
+      "notes": "⚠️ Remplacer VOTRE_PHONE_NUMBER_ID par l'ID de votre numéro WhatsApp Business dans Meta"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Ce que dit un de nos clients — et une offre pour vous",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nVoici le témoignage de Marie, propriétaire à Lille :<br><br>\n<i>\"J'entendais l'eau couler dans ma salle de bain sans voir de fuite visible. EMA Fuites a tout localisé en 1h30 sans casser un seul carreau. Mon assurance a accepté leur rapport immédiatement. Je recommande vivement !\"</i><br><br>\n<b>Nos tarifs pour les particuliers :</b><br>\n🔧 Détection simple : à partir de 180€<br>\n🔧 Rapport assurance inclus<br>\n🔧 Intervention sous 48h garantie<br><br>\n<b>Bon à savoir :</b> dans la plupart des cas, votre assurance habitation prend en charge les frais de détection. On vous aide à constituer votre dossier.<br><br>\nDésirez-vous qu'on vous rappelle pour faire le point sur votre situation ?<br><br>\nCordialement,<br><b>EMA Fuites</b>",
+        "options": {}
+      },
+      "id": "p011-email-3",
+      "name": "Gmail - Email particulier étape 3",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1600,
+        576
+      ],
+      "webhookId": "8c9cc13f-427a-40ba-8191-a03a8fc45ede",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5KWmGq134q2eiYyC",
+          "name": "COMPTE GMAIL EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "+33XXXXXXXXX",
+        "to": "={{ $json.phone }}",
+        "options": {}
+      },
+      "id": "p012-sms-4",
+      "name": "Twilio - SMS particulier étape 4",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        768
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "NdJKnqLRWuEnESVv",
+          "name": "Twilio account"
+        }
+      },
+      "notes": "⚠️ Remplacer +33XXXXXXXXX par votre numéro Twilio"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Délais cumulés en jours depuis le début : J0, J+2, J+5, J+10, J+20\nconst contact = $('Code JS - Filtrer contacts particuliers').item.json;\nconst etape = contact.etape;\nconst delays = [0, 2, 5, 10, 20];\n\nconst nextEtape = etape + 1;\nconst nextDelay = nextEtape < delays.length ? delays[nextEtape] - delays[etape] : null;\nconst nextDate = nextDelay !== null ? new Date(Date.now() + nextDelay * 24 * 3600 * 1000).toISOString() : null;\n\nreturn [{ json: {\n  contactId: contact.contactId,\n  newEtape: nextEtape,\n  nextDate: nextDate,\n  isLastStep: nextEtape >= 5\n}}];"
+      },
+      "id": "p013-code-calcul",
+      "name": "Code JS - Calculer prochaine étape",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"sequence_particulier_etape\": \"{{ $json.newEtape }}\", \"sequence_particulier_date_debut\": {{ $json.nextDate ? '\"' + $json.nextDate + '\"' : 'null' }}}}",
+        "options": {}
+      },
+      "id": "p014-hubspot-update",
+      "name": "HubSpot - Update étape particulier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2048,
+        384
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      },
+      "notes": "Met à jour l'étape et la date du prochain contact particulier"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.body.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"sequence_particulier_etape\": \"0\", \"sequence_particulier_date_debut\": \"{{ new Date().toISOString() }}\"}}",
+        "options": {}
+      },
+      "id": "p015-hubspot-init",
+      "name": "HubSpot - Init contact particulier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        480,
+        992
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      },
+      "notes": "Initialise le contact à l'étape 0 — le Schedule prend le relais dans l'heure"
+    }
+  ],
+  "connections": {
+    "Trigger - Toutes les heures": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Contacts particuliers à traiter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Démarrer séquence particulier": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Init contact particulier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Contacts particuliers à traiter": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Filtrer contacts particuliers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Filtrer contacts particuliers": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Vérifier statut deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Vérifier statut deal": {
+      "main": [
+        [
+          {
+            "node": "Si - Déjà client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Si - Déjà client": {
+      "main": [
+        [
+          {
+            "node": "Switch - Étape séquence",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Switch - Étape séquence": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Email particulier étape 0",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Twilio - SMS particulier étape 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp - Message particulier étape 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail - Email particulier étape 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Twilio - SMS particulier étape 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Email particulier étape 0": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Calculer prochaine étape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio - SMS particulier étape 1": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Calculer prochaine étape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp - Message particulier étape 2": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Calculer prochaine étape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Email particulier étape 3": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Calculer prochaine étape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio - SMS particulier étape 4": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Calculer prochaine étape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code JS - Calculer prochaine étape": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Update étape particulier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  }
+}

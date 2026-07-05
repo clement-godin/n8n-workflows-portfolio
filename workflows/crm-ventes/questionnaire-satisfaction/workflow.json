@@ -1,0 +1,2050 @@
+{
+  "name": "QUESTIONNAIRE SATISFACTION",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "94382d4a-fc6b-4827-a6f3-fe8abb22f164",
+      "name": "[SCHEDULE] - Trigger - Vérifie Interventions terminées",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        208,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/deals/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"filterGroups\": [{\"filters\": [{\"propertyName\": \"dealstage\", \"operator\": \"EQ\", \"value\": \"3422415592\"}]}], \"properties\": [\"dealname\", \"dealstage\", \"satisfaction_envoyee\", \"type_fuite\", \"ville_intervention\", \"technicien\"], \"limit\": 100}",
+        "options": {}
+      },
+      "id": "f12a7b6e-cfb6-4edb-a2e3-f3069752afd8",
+      "name": "[HUBSPOT] - Search - Deals Intervention terminée",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        432,
+        368
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst toProcess = [];\nfor (const item of items) {\n  const data = item.json;\n  const results = data.results || [data];\n  for (const d of results) {\n    const sent = d.properties?.satisfaction_envoyee;\n    if (!sent || sent === 'false') {\n      toProcess.push({ json: {\n        dealId: d.id,\n        dealName: d.properties?.dealname || '',\n        type_fuite: d.properties?.type_fuite || 'fuite',\n        ville_intervention: d.properties?.ville_intervention || '',\n        technicien: d.properties?.technicien || ''\n      }});\n    }\n  }\n}\nif (toProcess.length === 0) return [];\nreturn toProcess;\n"
+      },
+      "id": "35e237ac-5f6f-49c7-b940-9cb6da87928f",
+      "name": "[CODE JS] - Filtrer deals sans satisfaction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v1/deals/{{ $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"properties\": [{\"name\": \"satisfaction_envoyee\", \"value\": \"true\"}, {\"name\": \"date_satisfaction\", \"value\": \"={{ $now.toISO() }}\"}]}",
+        "options": {}
+      },
+      "id": "b8987119-f7e6-4a40-b6a7-2d91fdacd302",
+      "name": "[HUBSPOT] - Marquer satisfaction_envoyee = true",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        368
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hubapi.com/crm/v3/objects/deals/{{ $json.dealId }}/associations/contacts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "id": "d56870fb-ce03-468c-865f-cb16aec7f487",
+      "name": "[HUBSPOT] - Get Associations Contact du Deal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1104,
+        368
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst deal = $('Code JS - Filtrer deals sans satisfaction' in $items ? $('Code JS - Filtrer deals sans satisfaction') : $('[CODE JS] - Filtrer deals sans satisfaction')).item?.json\n  || $('[CODE JS] - Filtrer deals sans satisfaction').item?.json;\n// Use previous node reference safely\nconst prevDeal = $('[HUBSPOT] - Marquer satisfaction_envoyee = true').item?.json || {};\nconst dealId = prevDeal.dealId || '';\nconst dealName = prevDeal.dealName || '';\nconst type_fuite = prevDeal.type_fuite || 'fuite';\nconst ville = prevDeal.ville_intervention || '';\nconst technicien = prevDeal.technicien || '';\n\nconst assocData = $input.first().json;\nconst contacts = assocData?.results || [];\nif (contacts.length === 0) {\n  return [{ json: { dealId, dealName, type_fuite, ville_intervention: ville, technicien, contactId: null, hasContact: false }}];\n}\nreturn [{ json: {\n  dealId, dealName, type_fuite, ville_intervention: ville, technicien,\n  contactId: contacts[0].id,\n  hasContact: true\n}}];\n"
+      },
+      "id": "0051224d-bbf5-4fd2-9f04-241a01a85563",
+      "name": "[CODE JS] - Extraire contactId",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.hasContact }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "4c6c7482-461a-474c-aa80-c1910def9590"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e33c91d6-2e6b-450c-ac16-5cb16e816897",
+      "name": "[IF] - A un contact associé",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1552,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contactId }}?properties=firstname,phone,email,type_client,company",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "options": {}
+      },
+      "id": "94ff11b8-0372-47a2-966d-4a90b6da3561",
+      "name": "[HUBSPOT] - Get Contact profil complet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1776,
+        368
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst contactRaw = $input.first().json.properties || {};\nconst dealNode = $('[CODE JS] - Extraire contactId').item.json;\n\nconst prenom = contactRaw.firstname || 'cher client';\nconst email = contactRaw.email || '';\nconst company = contactRaw.company || '';\n\n// Déduire type_client\nlet type_client = (contactRaw.type_client || '').toLowerCase().trim();\nif (!type_client) {\n  type_client = company ? 'inconnu' : 'particulier';\n}\n\n// Format phone pour WhatsApp\nlet phone = contactRaw.phone || '';\nlet tel = phone.replace(/[\\s\\-\\.\\(\\)\\/]/g, '');\nif (tel.startsWith('0')) tel = '33' + tel.slice(1);\nif (tel && !tel.startsWith('+')) tel = '+' + tel;\n\nreturn [{json: {\n  dealId:            dealNode.dealId,\n  dealName:          dealNode.dealName,\n  type_fuite:        dealNode.type_fuite,\n  ville_intervention:dealNode.ville_intervention,\n  technicien:        dealNode.technicien,\n  contactId:         dealNode.contactId,\n  prenom,\n  email,\n  phone: tel,\n  hasPhone:  !!tel,\n  hasEmail:  !!email,\n  type_client,\n  company\n}}];\n"
+      },
+      "id": "892bb725-3a93-40ca-91d7-b82abc39cefa",
+      "name": "[CODE JS] - Enrichir profil client + déduire type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 24,
+        "unit": "hours"
+      },
+      "id": "6c7465cf-c492-41a4-8044-f0543adbcd30",
+      "name": "[ATTENTE] - 24h post-intervention",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2224,
+        368
+      ],
+      "webhookId": "4fa1beab-b22d-45cf-935b-04d3f4866c2e"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type_client }}",
+                    "rightValue": "particulier",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "9423d50e-a35f-4fa3-a4f5-d99d2506047a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "particulier"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type_client }}",
+                    "rightValue": "syndic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "a493715e-6962-4725-986f-2588ff8f75d6"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "syndic"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type_client }}",
+                    "rightValue": "bailleur",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "49c7e5fd-a66b-4303-a4c1-36f790cb09b8"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "bailleur"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type_client }}",
+                    "rightValue": "expert_sinistre",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "8b9341bb-85a4-4c8d-9cbb-5ed565db9eb4"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "expert_sinistre"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type_client }}",
+                    "rightValue": "plombier",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d682ff79-bd28-499c-96c6-5f76fcc28e07"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "plombier"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "030b4e7e-4e66-4c02-854b-492335622209",
+      "name": "[SWITCH] - Routing par type_client",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        2448,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.attente_nps) staticData.attente_nps = {};\n\nconst d = $json;\nconst telephone = d.phone || '';\n\nif (telephone) {\n  staticData.attente_nps[telephone] = {\n    contactId:         d.contactId,\n    dealId:            d.dealId,\n    prenom:            d.prenom,\n    email:             d.email,\n    type_fuite:        d.type_fuite,\n    ville_intervention:d.ville_intervention,\n    timestamp:         Date.now()\n  };\n}\nreturn [$input.first()];\n"
+      },
+      "id": "92009a58-5555-4d71-93b5-b27bbf433e1a",
+      "name": "[CODE JS] - Stocker attente_nps dans StaticData",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_WHATSAPP_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.phone }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": \"Bonjour {{ $json.prenom }} 👋 Suite à notre intervention pour votre {{ $json.type_fuite }} à {{ $json.ville_intervention }}, nous aimerions avoir votre avis.\\n\\nSur 10, quelle note donneriez-vous à notre intervention EMA Fuites ?\\n(Répondez simplement avec un chiffre de 0 à 10)\"\n  }\n}",
+        "options": {}
+      },
+      "id": "a5d29ea2-9ffd-417c-bff6-146c08a77ee8",
+      "name": "[META API] - WhatsApp - Envoyer question NPS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2896,
+        80
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v1/deals/{{ $('[CODE JS] - Stocker attente_nps dans StaticData').item.json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"properties\": [{\"name\": \"canal_satisfaction\", \"value\": \"whatsapp\"}]}",
+        "options": {}
+      },
+      "id": "0a52d001-bef2-4a1d-bb82-9e16a5d63a4e",
+      "name": "[HUBSPOT] - MAJ canal_satisfaction = whatsapp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3120,
+        80
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_SPREADSHEET_ID_EMA_FUITES",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "satisfaction",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+            "Contact": "={{ $('[CODE JS] - Stocker attente_nps dans StaticData').item.json.prenom }}",
+            "Telephone": "={{ $('[CODE JS] - Stocker attente_nps dans StaticData').item.json.phone }}",
+            "Email": "={{ $('[CODE JS] - Stocker attente_nps dans StaticData').item.json.email }}",
+            "Type_client": "={{ $('[CODE JS] - Stocker attente_nps dans StaticData').item.json.type_client }}",
+            "Ville": "={{ $('[CODE JS] - Stocker attente_nps dans StaticData').item.json.ville_intervention }}",
+            "Type_fuite": "={{ $('[CODE JS] - Stocker attente_nps dans StaticData').item.json.type_fuite }}",
+            "Canal": "whatsapp",
+            "Deal_ID": "={{ $('[CODE JS] - Stocker attente_nps dans StaticData').item.json.dealId }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "aecb2108-8fa0-4e3b-a17e-afde210774c3",
+      "name": "[SHEETS] - Logger envoi satisfaction WA",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        3344,
+        80
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Votre avis sur l'intervention EMA Fuites — {{ $json.ville_intervention }}",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nSuite à notre intervention concernant <b>{{ $json.type_fuite }}</b>, nous souhaiterions recueillir votre retour d'expérience.<br><br>\nCe questionnaire prend moins de 2 minutes :<br><br>\n👉 <a href=\"A_REMPLACER_PAR_URL_GOOGLE_FORM_SATISFACTION_B2B?dealId={{ $json.dealId }}&contact={{ $json.contactId }}\">Répondre au questionnaire</a><br><br>\nVotre avis nous permet d'améliorer continuellement la qualité de nos prestations.<br><br>\nCordialement,<br>\nL'équipe EMA Fuites",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "4900b594-2704-4449-933e-883f27dfd3c4",
+      "name": "[GMAIL] - Email satisfaction Form complet Syndic-Bailleur",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2672,
+        272
+      ],
+      "webhookId": "9dab329c-4634-4da3-8745-7e698d34d093",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5KWmGq134q2eiYyC",
+          "name": "COMPTE GMAIL EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v1/deals/{{ $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"properties\": [{\"name\": \"canal_satisfaction\", \"value\": \"email_form\"}]}",
+        "options": {}
+      },
+      "id": "01ec184a-ce2a-4d34-89eb-c84f24f2e789",
+      "name": "[HUBSPOT] - MAJ canal_satisfaction = email_form",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2896,
+        272
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_SPREADSHEET_ID_EMA_FUITES",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "satisfaction",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+            "Contact": "={{ $json.prenom }}",
+            "Telephone": "={{ $json.phone }}",
+            "Email": "={{ $json.email }}",
+            "Type_client": "={{ $json.type_client }}",
+            "Ville": "={{ $json.ville_intervention }}",
+            "Type_fuite": "={{ $json.type_fuite }}",
+            "Canal": "email_form",
+            "Deal_ID": "={{ $json.dealId }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "20d2797c-5e63-40ed-99fd-7f6a38784d9d",
+      "name": "[SHEETS] - Logger envoi satisfaction Email Form",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        3120,
+        272
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Retour rapide — Intervention EMA Fuites",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nUne seule question : sur 10, comment noteriez-vous notre intervention pour <b>{{ $json.type_fuite }}</b> à {{ $json.ville_intervention }} ?<br><br>\n👉 <a href=\"A_REMPLACER_PAR_URL_GOOGLE_FORM_SATISFACTION_COURT?dealId={{ $json.dealId }}&contact={{ $json.contactId }}\">Répondre en 30 secondes</a><br><br>\nMerci pour votre retour.<br>\nEMA Fuites",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "aecb94c7-213d-4d0f-8f41-ed970c6794a7",
+      "name": "[GMAIL] - Email satisfaction court Expert-Plombier",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2672,
+        464
+      ],
+      "webhookId": "9243684d-2da0-46f8-bfcb-70d3aceb5da6",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5KWmGq134q2eiYyC",
+          "name": "COMPTE GMAIL EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v1/deals/{{ $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"properties\": [{\"name\": \"canal_satisfaction\", \"value\": \"email_court\"}]}",
+        "options": {}
+      },
+      "id": "f5e3320e-fe91-43a5-9a9e-8ae515fb6c49",
+      "name": "[HUBSPOT] - MAJ canal_satisfaction = email_court",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2896,
+        464
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_SPREADSHEET_ID_EMA_FUITES",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "satisfaction",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+            "Contact": "={{ $json.prenom }}",
+            "Telephone": "={{ $json.phone }}",
+            "Email": "={{ $json.email }}",
+            "Type_client": "={{ $json.type_client }}",
+            "Ville": "={{ $json.ville_intervention }}",
+            "Type_fuite": "={{ $json.type_fuite }}",
+            "Canal": "email_court",
+            "Deal_ID": "={{ $json.dealId }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "4d926906-d584-4f60-adba-3ee8ac0b7007",
+      "name": "[SHEETS] - Logger envoi satisfaction Email Court",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        3120,
+        464
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Votre avis compte pour nous — EMA Fuites",
+        "message": "=Bonjour {{ $json.prenom }},<br><br>\nSuite à notre intervention (<b>{{ $json.type_fuite }}</b>), donnez-nous votre avis en 1 minute :<br><br>\n👉 <a href=\"A_REMPLACER_PAR_URL_GOOGLE_FORM_SATISFACTION_B2B?dealId={{ $json.dealId }}&contact={{ $json.contactId }}\">Répondre au questionnaire</a><br><br>\nMerci,<br>EMA Fuites",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "bbd32106-3a97-47d8-860a-bbf00fbb58f7",
+      "name": "[GMAIL] - Email satisfaction Form simplifié Default",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2672,
+        656
+      ],
+      "webhookId": "b2653b1a-279f-4bbf-800f-02593d7a1c62",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5KWmGq134q2eiYyC",
+          "name": "COMPTE GMAIL EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v1/deals/{{ $json.dealId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"properties\": [{\"name\": \"canal_satisfaction\", \"value\": \"email_default\"}]}",
+        "options": {}
+      },
+      "id": "26fd9f92-357c-4639-8881-492bcc0dfb72",
+      "name": "[HUBSPOT] - MAJ canal_satisfaction = email_default",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2896,
+        656
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wa-router-ema",
+        "options": {}
+      },
+      "id": "055d8521-9c50-415d-8c78-b03c16dad4eb",
+      "name": "[WEBHOOK] - Réception WA Messages - Routeur NPS",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        208,
+        1264
+      ],
+      "webhookId": "826c5850-0d11-4dc5-b223-939fb16a9796"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst staticData = $getWorkflowStaticData('global');\nconst body = $input.first().json.body || $input.first().json;\n\n// Extract WhatsApp message info\nlet fromTel = '';\nlet messageText = '';\nlet messageType = '';\n\ntry {\n  const changes = body?.entry?.[0]?.changes?.[0]?.value;\n  const messages = changes?.messages;\n  if (messages && messages.length > 0) {\n    fromTel = messages[0].from || '';\n    messageType = messages[0].type || '';\n    if (messageType === 'text') {\n      messageText = messages[0].text?.body || '';\n    }\n  }\n} catch(e) {}\n\n// Format phone to E.164\nlet fromFormatted = fromTel;\nif (fromFormatted && !fromFormatted.startsWith('+')) {\n  fromFormatted = '+' + fromFormatted;\n}\n\n// Check if in attente_nps\nconst attente = staticData.attente_nps || {};\nconst npsData = attente[fromFormatted] || attente[fromTel] || null;\nconst isNPS = !!npsData;\n\nreturn [{json: {\n  isNPS,\n  fromTel: fromFormatted || fromTel,\n  messageText,\n  messageType,\n  npsData,\n  originalBody: body\n}}];\n"
+      },
+      "id": "f700cf53-4243-48be-8c72-c9c46af7e182",
+      "name": "[CODE JS] - Router NPS vs Chatbot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isNPS }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "e13adf8b-8a8d-431a-8d52-379b72f5173b"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "78338325-40cf-451d-a4d7-4fbd91860a45",
+      "name": "[IF] - Est une réponse NPS attendue",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        656,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://your-domain.com/webhook/YOUR_WEBHOOK_ID",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.originalBody) }}",
+        "options": {}
+      },
+      "id": "0cb1dd88-065b-4bd9-b8ed-7cf40c971c01",
+      "name": "[HTTP] - Forward message vers Chatbot WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst d = $json;\nconst text = (d.messageText || '').trim();\nconst score = parseInt(text, 10);\nconst isValid = !isNaN(score) && score >= 0 && score <= 10;\n\nreturn [{json: {\n  isNPS:       d.isNPS,\n  fromTel:     d.fromTel,\n  messageText: d.messageText,\n  score:       isValid ? score : -1,\n  isValid,\n  npsData:     d.npsData\n}}];\n"
+      },
+      "id": "c8b86e7b-e046-4364-b2d2-fc1ca360eaea",
+      "name": "[CODE JS] - Parser et valider score NPS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "3c9f56b9-b793-4913-82f0-d8ab6a34a1bd"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "20e2b7c8-f4d7-487b-b6e6-41962d02ca33",
+      "name": "[IF] - Score NPS valide (0-10)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1104,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_WHATSAPP_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.fromTel }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": \"Je n'ai pas compris votre réponse 😊\\nPouvez-vous répondre avec un chiffre entre 0 et 10 ?\"\n  }\n}",
+        "options": {}
+      },
+      "id": "9c6008c0-9898-4b05-ae0b-f982e2c0364f",
+      "name": "[META API] - WhatsApp - Demander score valide",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1328,
+        1168
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 9,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    },
+                    "id": "19d123a1-16b8-4029-90b6-6defe67bf5f3"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "promoteur"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 7,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    },
+                    "id": "5bf95d9d-2130-426c-8791-92f539c1b40d"
+                  },
+                  {
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 8,
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    },
+                    "id": "b6bcb999-3a81-4c04-9938-6d4af7ee8474"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "passif"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "329bd65c-206d-4e2f-a2b9-e7c70626f60e",
+      "name": "[SWITCH] - NPS Promoteur / Passif / Détracteur",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1328,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_WHATSAPP_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.fromTel }}\",\n  \"type\": \"text\",\n  \"text\": {{\n    \"preview_url\": false,\n    \"body\": \"Merci beaucoup {{ $json.npsData.prenom }} ! 🙏\\nVotre satisfaction est notre priorité.\\nUn avis Google nous aiderait énormément à aider d'autres personnes dans votre situation 👉 https://g.page/r/Ce4YqPOY2L2PEAE/review\"\n  }}\n}}",
+        "options": {}
+      },
+      "id": "cceae3f7-a06e-4ca7-b584-2463ae25d4d9",
+      "name": "[META API] - WhatsApp - Merci promoteur + lien Google",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1552,
+        880
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "yyNlIALiusBW3HFu",
+          "mode": "id"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "1e0ce201-60bc-41ed-8693-af7a4cbef1a8",
+      "name": "[EXECUTE WF] - Déclencher Demande Avis Google (Promoteur)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1776,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst staticData = $getWorkflowStaticData('global');\nconst tel = $json.fromTel;\nif (staticData.attente_nps) {\n  delete staticData.attente_nps[tel];\n}\nreturn [$input.first()];\n"
+      },
+      "id": "0311f4cd-ae25-4d15-b0fd-985df41a9312",
+      "name": "[CODE JS] - Cleanup StaticData promoteur",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.npsData.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"nps_score\": \"{{ $json.score }}\",\n    \"nps_date\": \"{{ $now.toISO() }}\",\n    \"nps_commentaire\": \"Score {{ $json.score }}/10 — Promoteur\"\n  }\n}",
+        "options": {}
+      },
+      "id": "0b9204ff-46cd-47b8-913f-d71a4a586b1c",
+      "name": "[HUBSPOT] - MAJ NPS promoteur + activité",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2224,
+        880
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_SPREADSHEET_ID_EMA_FUITES",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "satisfaction",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+            "Contact": "={{ $json.npsData.prenom }}",
+            "Telephone": "={{ $json.fromTel }}",
+            "Email": "={{ $json.npsData.email }}",
+            "Type_fuite": "={{ $json.npsData.type_fuite }}",
+            "Ville": "={{ $json.npsData.ville_intervention }}",
+            "Score_NPS": "={{ $json.score }}",
+            "Canal": "whatsapp",
+            "Avis_Google_demande": "oui",
+            "Deal_ID": "={{ $json.npsData.dealId }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "3dce8feb-faa1-4a69-a249-624aad3547e9",
+      "name": "[SHEETS] - Logger NPS promoteur",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2448,
+        880
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_WHATSAPP_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.fromTel }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": \"Merci {{ $json.npsData.prenom }} pour votre retour 😊\\nY a-t-il quelque chose que nous aurions pu améliorer ?\"\n  }\n}",
+        "options": {}
+      },
+      "id": "802adb4a-8ccc-4222-8308-67b7490de01c",
+      "name": "[META API] - WhatsApp - Merci passif",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1552,
+        1072
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst staticData = $getWorkflowStaticData('global');\nconst tel = $json.fromTel;\nif (staticData.attente_nps) delete staticData.attente_nps[tel];\nreturn [$input.first()];\n"
+      },
+      "id": "6bf252a9-4909-4cf2-8716-cd4e8cce09db",
+      "name": "[CODE JS] - Cleanup StaticData passif",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        1072
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.npsData.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"nps_score\": \"{{ $json.score }}\",\n    \"nps_date\": \"{{ $now.toISO() }}\",\n    \"nps_commentaire\": \"Score {{ $json.score }}/10 — Passif\"\n  }\n}",
+        "options": {}
+      },
+      "id": "9cc9b69e-630f-48a6-beab-cf56758238db",
+      "name": "[HUBSPOT] - MAJ NPS passif",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2000,
+        1072
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_SPREADSHEET_ID_EMA_FUITES",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "satisfaction",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+            "Contact": "={{ $json.npsData.prenom }}",
+            "Telephone": "={{ $json.fromTel }}",
+            "Score_NPS": "={{ $json.score }}",
+            "Canal": "whatsapp",
+            "Avis_Google_demande": "non",
+            "Deal_ID": "={{ $json.npsData.dealId }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "90261c2e-df68-48b8-8f45-f0257bb60115",
+      "name": "[SHEETS] - Logger NPS passif",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2224,
+        1072
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/YOUR_WHATSAPP_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"messaging_product\": \"whatsapp\",\n  \"recipient_type\": \"individual\",\n  \"to\": \"{{ $json.fromTel }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": \"Merci {{ $json.npsData.prenom }} pour votre honnêteté.\\nNous sommes désolés que votre expérience n'ait pas été à la hauteur de vos attentes.\\nPouvez-vous nous dire ce qui s'est passé ?\\nNous allons revenir vers vous rapidement.\"\n  }\n}",
+        "options": {}
+      },
+      "id": "a360025a-0efc-47b5-b372-ab6b43060a3e",
+      "name": "[META API] - WhatsApp - Merci détracteur",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1552,
+        1264
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ipuyPxHzoDOCOVAH",
+          "name": "Meta WhatsApp Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🚨 <b>NPS NÉGATIF</b>\n\n👤 {{ $json.npsData.prenom }} — {{ $json.fromTel }}\n📍 {{ $json.npsData.ville_intervention }} — {{ $json.npsData.type_fuite }}\n⭐ Score : {{ $json.score }}/10\n💬 Canal : WhatsApp\n\n→ À rappeler dans les 2h",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "4e18a190-0f09-4bd0-8b2d-4925d82c1f9a",
+      "name": "[TELEGRAM] - Alerte NPS négatif WA",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1776,
+        1264
+      ],
+      "webhookId": "9690d66e-1137-4f75-88b3-3e7152d59213",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst staticData = $getWorkflowStaticData('global');\nconst tel = $('[CODE JS] - Router NPS vs Chatbot').item?.json?.fromTel || $json.fromTel;\nif (staticData.attente_nps) delete staticData.attente_nps[tel];\nreturn [$input.first()];\n"
+      },
+      "id": "79720a97-4ffc-449a-acd8-d7c3d3fd92f9",
+      "name": "[CODE JS] - Cleanup StaticData détracteur",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $('[CODE JS] - Router NPS vs Chatbot').item.json.npsData.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"nps_score\": \"{{ $('[SWITCH] - NPS Promoteur / Passif / Détracteur').item.json.score }}\",\n    \"nps_date\": \"{{ $now.toISO() }}\",\n    \"nps_commentaire\": \"Score {{ $('[SWITCH] - NPS Promoteur / Passif / Détracteur').item.json.score }}/10 — INSATISFAIT\",\n    \"hs_lead_status\": \"INSATISFAIT\"\n  }\n}",
+        "options": {}
+      },
+      "id": "ce508ee3-55f7-4f09-ac7e-26da947902af",
+      "name": "[HUBSPOT] - MAJ NPS détracteur + tag INSATISFAIT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2224,
+        1264
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "VOTRE_SPREADSHEET_ID_EMA_FUITES",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "satisfaction",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('dd/MM/yyyy HH:mm') }}",
+            "Contact": "={{ $('[CODE JS] - Router NPS vs Chatbot').item.json.npsData.prenom }}",
+            "Telephone": "={{ $('[CODE JS] - Router NPS vs Chatbot').item.json.fromTel }}",
+            "Score_NPS": "={{ $('[SWITCH] - NPS Promoteur / Passif / Détracteur').item.json.score }}",
+            "Canal": "whatsapp",
+            "Avis_Google_demande": "non",
+            "Deal_ID": "={{ $('[CODE JS] - Router NPS vs Chatbot').item.json.npsData.dealId }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "051deedd-407f-4300-9a90-6cec2cdd45eb",
+      "name": "[SHEETS] - Logger NPS détracteur",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        2448,
+        1264
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "13a9cac8-9435-43bd-b05d-7b805e8288dc",
+      "name": "[SHEETS TRIGGER] - Nouvelles réponses satisfaction_b2b",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 4,
+      "position": [
+        208,
+        1776
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "rCFvQBVaQVzg9Lrq",
+          "name": "CLIENT OAUTH COMPTE GOOGLE SHEET EMAFUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// La réponse du form arrive depuis Google Sheets\n// Colonnes attendues : Score_NPS, Contact_ID, Deal_ID, Email, Prenom, Commentaire\nconst row = $input.first().json;\nconst score = parseInt(row['Score_NPS'] || row['Note_globale'] || row['score'] || '0', 10);\nconst contactId = row['Contact_ID'] || row['contactId'] || '';\nconst dealId    = row['Deal_ID']    || row['dealId']    || '';\nconst email     = row['Email']      || row['email']     || '';\nconst prenom    = row['Prenom']     || row['prenom']    || 'client';\nconst commentaire = row['Commentaire'] || row['commentaire'] || '';\n\nreturn [{json: { score, contactId, dealId, email, prenom, commentaire }}];\n"
+      },
+      "id": "2a12004c-2c65-4bf9-998c-dba42bb74494",
+      "name": "[CODE JS] - Parser réponse form + score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        1776
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 9,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    },
+                    "id": "75c01fb9-08b1-4b9e-9022-c12dcbcaa7fc"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "promoteur"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": false,
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 7,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    },
+                    "id": "098366d9-3f61-40c1-85ba-7df11275d6c7"
+                  },
+                  {
+                    "leftValue": "={{ $json.score }}",
+                    "rightValue": 8,
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    },
+                    "id": "529e6a42-cf8c-424c-bf7a-321cb6d79caa"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "passif"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1ba38875-c16c-4f53-a6d3-1673d46642a7",
+      "name": "[SWITCH] - NPS Email score Promoteur-Passif-Détracteur",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        656,
+        1776
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "yyNlIALiusBW3HFu",
+          "mode": "id"
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "226cec28-8209-4053-9a59-f4898b9062b7",
+      "name": "[EXECUTE WF] - Déclencher Demande Avis Google (Form)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        1584
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"nps_score\": \"{{ $json.score }}\", \"nps_date\": \"{{ $now.toISO() }}\", \"nps_commentaire\": \"{{ $json.commentaire }}\"}}",
+        "options": {}
+      },
+      "id": "934a9cd9-98c0-43ad-90d0-75d0295c359d",
+      "name": "[HUBSPOT] - MAJ NPS promoteur email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1104,
+        1584
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"nps_score\": \"{{ $json.score }}\", \"nps_date\": \"{{ $now.toISO() }}\", \"nps_commentaire\": \"{{ $json.commentaire }}\"}}",
+        "options": {}
+      },
+      "id": "a8ced369-5cb7-4a2a-b2af-e046d7b68ae7",
+      "name": "[HUBSPOT] - MAJ NPS passif email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        1776
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🚨 <b>NPS NÉGATIF — Formulaire</b>\n\n👤 {{ $json.prenom }} — {{ $json.email }}\n⭐ Score : {{ $json.score }}/10\n💬 Commentaire : {{ $json.commentaire }}\n📋 Deal : {{ $json.dealId }}\n\n→ À rappeler dans les 2h",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "51f91a17-57fe-43f3-be32-3ca0c0af7d38",
+      "name": "[TELEGRAM] - Alerte NPS négatif email",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        1968
+      ],
+      "webhookId": "f9f04a6c-4174-41de-81be-d32862e9e68f",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.hubapi.com/crm/v3/objects/contacts/{{ $json.contactId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"properties\": {\"nps_score\": \"{{ $json.score }}\", \"nps_date\": \"{{ $now.toISO() }}\", \"nps_commentaire\": \"{{ $json.commentaire }} — INSATISFAIT\", \"hs_lead_status\": \"INSATISFAIT\"}}",
+        "options": {}
+      },
+      "id": "cce826f7-a3a6-485f-8f36-961c6396bafe",
+      "name": "[HUBSPOT] - MAJ NPS détracteur email + tag INSATISFAIT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1104,
+        1968
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "JnaOUFzIE4lA3O1R",
+          "name": "HubSpot account EMA FUITES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "[SCHEDULE] - Trigger - Vérifie Interventions terminées": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - Search - Deals Intervention terminée",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - Search - Deals Intervention terminée": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Filtrer deals sans satisfaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Filtrer deals sans satisfaction": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - Marquer satisfaction_envoyee = true",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - Marquer satisfaction_envoyee = true": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - Get Associations Contact du Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - Get Associations Contact du Deal": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Extraire contactId",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Extraire contactId": {
+      "main": [
+        [
+          {
+            "node": "[IF] - A un contact associé",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[IF] - A un contact associé": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - Get Contact profil complet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - Get Contact profil complet": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Enrichir profil client + déduire type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Enrichir profil client + déduire type": {
+      "main": [
+        [
+          {
+            "node": "[ATTENTE] - 24h post-intervention",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[ATTENTE] - 24h post-intervention": {
+      "main": [
+        [
+          {
+            "node": "[SWITCH] - Routing par type_client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[SWITCH] - Routing par type_client": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Stocker attente_nps dans StaticData",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[GMAIL] - Email satisfaction Form complet Syndic-Bailleur",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[GMAIL] - Email satisfaction Form complet Syndic-Bailleur",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[GMAIL] - Email satisfaction court Expert-Plombier",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[CODE JS] - Stocker attente_nps dans StaticData",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[GMAIL] - Email satisfaction Form simplifié Default",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Stocker attente_nps dans StaticData": {
+      "main": [
+        [
+          {
+            "node": "[META API] - WhatsApp - Envoyer question NPS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[META API] - WhatsApp - Envoyer question NPS": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ canal_satisfaction = whatsapp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - MAJ canal_satisfaction = whatsapp": {
+      "main": [
+        [
+          {
+            "node": "[SHEETS] - Logger envoi satisfaction WA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[GMAIL] - Email satisfaction Form complet Syndic-Bailleur": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ canal_satisfaction = email_form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - MAJ canal_satisfaction = email_form": {
+      "main": [
+        [
+          {
+            "node": "[SHEETS] - Logger envoi satisfaction Email Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[GMAIL] - Email satisfaction court Expert-Plombier": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ canal_satisfaction = email_court",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - MAJ canal_satisfaction = email_court": {
+      "main": [
+        [
+          {
+            "node": "[SHEETS] - Logger envoi satisfaction Email Court",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[GMAIL] - Email satisfaction Form simplifié Default": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ canal_satisfaction = email_default",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[WEBHOOK] - Réception WA Messages - Routeur NPS": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Router NPS vs Chatbot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Router NPS vs Chatbot": {
+      "main": [
+        [
+          {
+            "node": "[IF] - Est une réponse NPS attendue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[IF] - Est une réponse NPS attendue": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Parser et valider score NPS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[HTTP] - Forward message vers Chatbot WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Parser et valider score NPS": {
+      "main": [
+        [
+          {
+            "node": "[IF] - Score NPS valide (0-10)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[IF] - Score NPS valide (0-10)": {
+      "main": [
+        [
+          {
+            "node": "[SWITCH] - NPS Promoteur / Passif / Détracteur",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[META API] - WhatsApp - Demander score valide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[SWITCH] - NPS Promoteur / Passif / Détracteur": {
+      "main": [
+        [
+          {
+            "node": "[META API] - WhatsApp - Merci promoteur + lien Google",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[META API] - WhatsApp - Merci passif",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[META API] - WhatsApp - Merci détracteur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[META API] - WhatsApp - Merci promoteur + lien Google": {
+      "main": [
+        [
+          {
+            "node": "[EXECUTE WF] - Déclencher Demande Avis Google (Promoteur)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[EXECUTE WF] - Déclencher Demande Avis Google (Promoteur)": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Cleanup StaticData promoteur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Cleanup StaticData promoteur": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ NPS promoteur + activité",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - MAJ NPS promoteur + activité": {
+      "main": [
+        [
+          {
+            "node": "[SHEETS] - Logger NPS promoteur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[META API] - WhatsApp - Merci passif": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Cleanup StaticData passif",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Cleanup StaticData passif": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ NPS passif",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - MAJ NPS passif": {
+      "main": [
+        [
+          {
+            "node": "[SHEETS] - Logger NPS passif",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[META API] - WhatsApp - Merci détracteur": {
+      "main": [
+        [
+          {
+            "node": "[TELEGRAM] - Alerte NPS négatif WA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[TELEGRAM] - Alerte NPS négatif WA": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Cleanup StaticData détracteur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Cleanup StaticData détracteur": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ NPS détracteur + tag INSATISFAIT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[HUBSPOT] - MAJ NPS détracteur + tag INSATISFAIT": {
+      "main": [
+        [
+          {
+            "node": "[SHEETS] - Logger NPS détracteur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[SHEETS TRIGGER] - Nouvelles réponses satisfaction_b2b": {
+      "main": [
+        [
+          {
+            "node": "[CODE JS] - Parser réponse form + score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[CODE JS] - Parser réponse form + score": {
+      "main": [
+        [
+          {
+            "node": "[SWITCH] - NPS Email score Promoteur-Passif-Détracteur",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[SWITCH] - NPS Email score Promoteur-Passif-Détracteur": {
+      "main": [
+        [
+          {
+            "node": "[EXECUTE WF] - Déclencher Demande Avis Google (Form)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[HUBSPOT] - MAJ NPS passif email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "[TELEGRAM] - Alerte NPS négatif email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[EXECUTE WF] - Déclencher Demande Avis Google (Form)": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ NPS promoteur email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "[TELEGRAM] - Alerte NPS négatif email": {
+      "main": [
+        [
+          {
+            "node": "[HUBSPOT] - MAJ NPS détracteur email + tag INSATISFAIT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "availableInMCP": false,
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  }
+}

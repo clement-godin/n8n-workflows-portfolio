@@ -1,0 +1,126 @@
+{
+  "name": "NETTOYAGE BACK UP N8N",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const stdout = $input.first().json.stdout || '';\nconst stderr = $input.first().json.stderr || '';\nconst output = stdout + stderr;\n\n// Extrait le résumé rclone\nconst lines = output.split('\\n').filter(l => l.trim());\nconst lastLines = lines.slice(-10).join('\\n');\n\n// Détecte les erreurs\nconst hasError = output.toLowerCase().includes('error') || output.toLowerCase().includes('failed');\n\n// Compte les suppressions\nconst deleteMatch = output.match(/(\\d+) files? deleted/i);\nconst nbDeleted = deleteMatch ? deleteMatch[1] : '0';\n\nconst message = hasError\n  ? '❌ <b>Nettoyage BACK UP N8N — Erreur</b>\\n\\n<code>' + lastLines.substring(0, 1000) + '</code>'\n  : '🧹 <b>Nettoyage BACK UP N8N — Terminé</b>\\n\\n' +\n    '🗑️ Doublons supprimés : <b>' + nbDeleted + '</b>\\n' +\n    (nbDeleted === '0' ? '✅ Aucun doublon trouvé' : '✅ Drive nettoyé') + '\\n\\n' +\n    '<code>' + lastLines.substring(0, 500) + '</code>';\n\nreturn [{ json: { message, hasError, nbDeleted } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "2c0b0615-526d-4dd6-9b36-964f6d0b4477",
+      "name": "Code JS - Parse résultat rclone"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "30ff9251-7531-4b41-a35a-b7a7745bf3b1",
+      "name": "Telegram - Rapport nettoyage",
+      "webhookId": "clean-webhook-0000-0000-000000000004",
+      "credentials": {
+        "telegramApi": {
+          "id": "zteuycKXeHxzAROh",
+          "name": "notif_erreur_workflow_n8n_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "rclone dedupe --dedupe-mode newest --config /home/debian/.config/rclone/rclone.conf \"gdrive:BACK UP/BACK UP N8N\" 2>&1 | tail -20"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "id": "21178801-fc4e-47d8-9640-a624af2dccf7",
+      "name": "SSH - Dedupe BACK UP N8N",
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "bt56RSR5H3bzgKsg",
+          "name": "SSH Private Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "63dca8f7-4fd1-4f9d-a64d-611836d45463",
+      "name": "Trigger - Nettoyage backup 1h00"
+    }
+  ],
+  "connections": {
+    "Code JS - Parse résultat rclone": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Rapport nettoyage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SSH - Dedupe BACK UP N8N": {
+      "main": [
+        [
+          {
+            "node": "Code JS - Parse résultat rclone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger - Nettoyage backup 1h00": {
+      "main": [
+        [
+          {
+            "node": "SSH - Dedupe BACK UP N8N",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "wg0YurkUmY4jQap6",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
